@@ -1,0 +1,6 @@
+---
+tags:
+  - MySQL
+category:
+  - Interview
+---
