@@ -1,0 +1,6 @@
+---
+tags:
+  - Redis
+category:
+  - Interview
+---
