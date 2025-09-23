@@ -1,6 +1,0 @@
----
-tags:
-  - SpringBoot
-category:
-  - InteviewSubject
----
