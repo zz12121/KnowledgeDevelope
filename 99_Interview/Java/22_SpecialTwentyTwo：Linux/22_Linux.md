@@ -1,0 +1,6 @@
+---
+tags:
+  - Linux
+category:
+  - Interview
+---

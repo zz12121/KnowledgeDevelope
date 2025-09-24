@@ -8,6 +8,7 @@ category:
 | 序号  | 题目                                              | 难度  | 链接  |
 | :-: | :---------------------------------------------- | :-: | :-: |
 |     | 说说进程和线程的区别？                                     |     |     |
+|     | 什么是并发和并行？                                       |     |     |
 |     | 说说 Java 中实现多线程有几种方法                             |     |     |
 |     | 什么是 Callable 和 Future?                          |     |     |
 |     | 什么是 Future 和 FutureTask?                        |     |     |
@@ -30,6 +31,9 @@ category:
 |     | SimpleDateFormat 是线程安全的吗为什么？                    |     |     |
 |     | servlet 是线程安全吗?                                 |     |     |
 |     | 说一下线程之间是如何通信的？                                  |     |     |
+|     | 什么是上下文切换？                                       |     |     |
+|     | 什么是线程调度？                                        |     |     |
+|     | 什么是线程优先级？                                       |     |     |
 |     | 多线程同步有哪些方法？                                     |     |     |
 |     | 多线程越多效率越高吗？                                     |     |     |
 |     | 将 10000 以内的整数进行相加是单线程快还是分组相加再汇总快？               |     |     |
@@ -52,7 +56,10 @@ category:
 |     | 了解线程池状态吗？                                       |     |     |
 |     | 线程池核心线程数怎么设置呢？                                  |     |     |
 |     | 当任务数超过线程池的核心线程数时，如何让它不进入队列，而是直接启用最大线程数          |     |     |
+|     | 线程池的异常处理机制是什么？                                  |     |     |
 |     | Java 线程池中队列常用类型有哪些？                             |     |     |
+|     | BlockingQueue接口的主要实现类有哪些？分别适用于什么场景？             |     |     |
+|     | ArrayBlockingQueue和LinkedBlockingQueue的区别？      |     |     |
 |     | 什么是阻塞队列？                                        |     |     |
 |     | 阻塞队列的实现原理是什么？                                   |     |     |
 |     | 如何使用阻塞队列来实现生产者-消费者模型？                           |     |     |
@@ -64,29 +71,51 @@ category:
 |     | 产生死锁的四个必要条件？                                    |     |     |
 |     | 如何避免死锁？如何解决死锁问题？                                |     |     |
 |     | 你们线程池是怎么做监控的？                                   |     |     |
+|     | CompletableFuture的特点和用法？                        |     |     |
 |     | IO 密集型=N cpu*2 是怎么计算出来？                         |     |     |
+|     | 什么是Java内存模型？                                    |     |     |
+|     | 说说你对 JMM 内存模型的理解？为什么需要 JMM？                     |     |     |
+|     | JMM中的主内存和工作内存是什么？                               |     |     |
+|     | 什么是原子性、可见性、有序性？                                 |     |     |
+|     | final关键字的内存语义是什么？                               |     |     |
 |     | volatile 关键字的作用？                                |     |     |
 |     | 什么原因导致可见性 ？                                     |     |     |
-|     | 为什么代码会重排序？                                      |     |     |
+|     | volatile能保证原子性吗？                                |     |     |
+|     | volatile的内存语义是什么？                               |     |     |
+|     | 为什么代码会重排序？有哪几种类型？                               |     |     |
+|     | volatile的happens-before关系是什么？                   |     |     |
+|     | happens-before规则有哪些？                            |     |     |
+|     | volatile的内存屏障是什么？                               |     |     |
 |     | 说一说自己对于 synchronized 关键字的了解                     |     |     |
 |     | 为什么说 Synchronized 是非公平锁？                        |     |     |
 |     | 为什么说 Synchronized 是可重入锁？                        |     |     |
 |     | 说说你是如何使用 synchronized 的？                        |     |     |
+|     | synchronized修饰方法和代码块有什么区别？                      |     |     |
+|     | synchronized的对象锁和类锁的区别是什么？                      |     |     |
 |     | 锁的优化机制了解吗？                                      |     |     |
 |     | JVM 对 Java 的原生锁做了哪些优化？                          |     |     |
+|     | 什么是偏向锁、轻量级锁、重量级锁？                               |     |     |
 |     | 什么是锁消除和锁粗化？                                     |     |     |
 |     | 多线程中 synchronized 锁升级的原理是什么？                    |     |     |
 |     | 什么是自旋?                                          |     |     |
 |     | Java 中 synchronized 和 ReentrantLock 有什么不同？      |     |     |
+|     | volatile和synchronized的区别是什么？                    |     |     |
 |     | SynchronizedMap 和 ConcurrentHashMap 有什么区别？      |     |     |
+|     | ConcurrentHashMap在JDK 1.7和1.8中的实现有什么区别？         |     |     |
 |     | ConcurrentHashMap 中 key，可以为 null 吗？             |     |     |
 |     | ConcurrentHashMap 的存储结构是怎样的？                    |     |     |
+|     | ConcurrentHashMap的put流程？                        |     |     |
+|     | ConcurrentHashMap的扩容机制？                         |     |     |
 |     | Vector 是一个线程安全类吗？                               |     |     |
-|     | 说说你对 JMM 内存模型的理解？为什么需要 JMM？                     |     |     |
 |     | CAS 的原理是什么                                      |     |     |
 |     | CAS 有什么缺点吗？                                     |     |     |
 |     | 乐观锁和悲观锁的理解及如何实现，有哪些实现方式？                        |     |     |
 |     | 乐观锁一定就是好的吗？                                     |     |     |
-|     | 什么是 AQS？                                        |     |     |
+|     | 什么是 AQS？原理是什么？                                  |     |     |
 |     | AQS 对资源的共享方式？                                   |     |     |
+|     | ReentrantLock的特点是什么？                            |     |     |
+|     | 什么是公平锁和非公平锁？                                    |     |     |
+|     | CountDownLatch的作用和原理？                           |     |     |
+|     | CyclicBarrier的作用和原理？                            |     |     |
 |     | 说说 CyclicBarrier 和 CountDownLatch 的区别？          |     |     |
+|     | CopyOnWriteArrayList的实现原理是什么？适用于什么场景？           |     |     |

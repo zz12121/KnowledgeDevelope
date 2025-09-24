@@ -1,0 +1,6 @@
+---
+tags:
+  - DesignPattern
+category:
+  - Interview
+---
