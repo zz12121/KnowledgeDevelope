@@ -1,6 +1,0 @@
----
-tags:
-  - Tomcat
-category:
-  - Interview
----

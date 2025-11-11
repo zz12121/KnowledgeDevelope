@@ -1,6 +1,0 @@
----
-tags:
-  - Mybatis
-category:
-  - Interview
----

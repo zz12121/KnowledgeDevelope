@@ -1,6 +1,0 @@
----
-tags:
-  - Zookeeper
-category:
-  - Interview
----

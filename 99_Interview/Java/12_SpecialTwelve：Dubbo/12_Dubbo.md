@@ -1,6 +1,0 @@
----
-tags:
-  - Dubbo
-category:
-  - Interview
----

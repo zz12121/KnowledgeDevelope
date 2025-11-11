@@ -1,6 +1,0 @@
----
-tags:
-  - MongoDB
-category:
-  - Interview
----

@@ -1,6 +1,0 @@
----
-tags:
-  - Netty
-category:
-  - Interview
----

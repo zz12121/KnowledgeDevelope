@@ -1,6 +1,0 @@
----
-tags:
-  - Spring
-category:
-  - Interview
----

@@ -1,6 +1,0 @@
----
-tags:
-  - MessageQueue
-category:
-  - Interview
----

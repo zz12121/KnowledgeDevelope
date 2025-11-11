@@ -1,6 +1,0 @@
----
-tags:
-  - Scene
-category:
-  - Interview
----

@@ -1,6 +1,0 @@
----
-tags:
-  - Git
-category:
-  - Interview
----

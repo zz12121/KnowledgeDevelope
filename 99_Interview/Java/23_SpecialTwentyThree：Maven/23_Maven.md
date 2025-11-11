@@ -1,6 +1,0 @@
----
-tags:
-  - Maven
-category:
-  - Interview
----

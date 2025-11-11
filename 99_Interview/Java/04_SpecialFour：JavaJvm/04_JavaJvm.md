@@ -1,6 +1,0 @@
----
-tags:
-  - java
-category:
-  - Interview
----
