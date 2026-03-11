@@ -2,21 +2,27 @@
 
 ## 一句话说明（白话）
 
+== 比较引用地址，equals 比较内容（类重写后）。
 
 ## 它解决什么问题 / 为什么重要
 
+避免把对象地址当内容比较；集合、去重场景很关键。
 
 ## 核心原理（一步步讲清楚）
 
+Object.equals 默认等同 ==；重写需配合 hashCode 一致性。
 
 ##典型使用场景
 
+字符串、值对象比较。
 
 ## 简单例子 /伪代码
 
+String a="x"; String b=new String("x"); a==b false, a.equals(b) true。
 
 ## 常见坑与误区
 
+重写 equals 不重写 hashCode。
 
 ##题库要点（原始材料）
 **不对。这句话严重违反了`equals`和`hashCode`方法的契约。

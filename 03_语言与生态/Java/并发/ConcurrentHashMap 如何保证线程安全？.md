@@ -2,21 +2,27 @@
 
 ## 一句话说明（白话）
 
+hashCode 是对象散列标识，用于加速查找。
 
 ## 它解决什么问题 / 为什么重要
 
+HashMap/HashSet先用 hashCode 定位桶，再用 equals 判断。
 
 ## 核心原理（一步步讲清楚）
 
+equals 相等必须 hashCode 相等。
 
 ##典型使用场景
 
+Map key、Set 去重。
 
 ## 简单例子 /伪代码
 
+equals 基于 id，hashCode也应基于 id。
 
 ## 常见坑与误区
 
+hashCode 相同不代表 equals 相同。
 
 ##题库要点（原始材料）
 - **CAS + synchronized**：这是 JDK 1.8 的核心机制。在执行写操作时，首先会尝试使用 CAS 无锁化方式插入数据，若失败（说明有竞争），则再使用 synchronized 对链表的头节点或树的根节点加锁。
