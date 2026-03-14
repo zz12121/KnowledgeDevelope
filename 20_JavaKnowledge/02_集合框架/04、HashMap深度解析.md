@@ -388,3 +388,8 @@ map.entrySet().removeIf(e -> e.getValue() < 0);
 | JDK 7 头插法的问题 | 并发扩容时链表顺序反转可能形成环，导致死循环 |
 | 线程不安全的根本原因 | 复合操作非原子（判断+写入非原子），多线程会数据覆盖 |
 | 如何线程安全 | ConcurrentHashMap（推荐）|
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]

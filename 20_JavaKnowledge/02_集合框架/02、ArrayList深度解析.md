@@ -374,3 +374,8 @@ synchronized (syncList) {
 | 遍历时安全删除 | 迭代器 remove / removeIf / 倒序 for 循环 |
 | ArrayList vs LinkedList | 随机访问用 ArrayList（O(1)）；频繁头尾操作用 LinkedList |
 | 为什么 elementData 是 transient | 自定义序列化，只序列化有效元素，不序列化 null 槽 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]

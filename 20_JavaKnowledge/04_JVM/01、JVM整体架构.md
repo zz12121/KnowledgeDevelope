@@ -300,3 +300,8 @@ ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024);
 | JIT 的作用 | 编译热点代码为机器码缓存，提升长期运行性能 |
 | 分层编译 | JDK8 默认开启，C1（快速低优）+ C2（慢速高优）配合 |
 | 逃逸分析的优化手段 | 栈上分配、标量替换、锁消除 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/01、JVM 基础概念|01、JVM 基础概念]] | [[../../10_Developlanguage/001_java/01_JavaBaseSubject/01、Java 语言基础|基础-01、Java 语言基础]]

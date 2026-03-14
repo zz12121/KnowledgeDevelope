@@ -329,3 +329,8 @@ public class TwoLevelCache<K, V> {
 | LRU 中为什么头节点是最久未用的 | accessOrder=true 时，每次访问/插入都把节点移到尾部，头部就是最久没被访问的 |
 | afterNodeAccess 的作用 | 将被访问的节点移到双向链表的尾部（仅 accessOrder=true 时生效）|
 | removeEldestEntry 的默认实现 | 返回 false，即不自动删除，需要子类重写来实现容量限制 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]

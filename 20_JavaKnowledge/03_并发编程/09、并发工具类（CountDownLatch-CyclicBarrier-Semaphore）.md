@@ -255,3 +255,8 @@ String data = exchanger.exchange("数据from B");
 | CountDownLatch 和 CyclicBarrier 的区别 | CDL 等事件（一次性）；CB 等线程互相到达（可循环），CB 可有屏障动作 |
 | Semaphore 是公平的吗 | 默认非公平，可以通过构造器参数设为公平 |
 | Semaphore 释放许可证的注意事项 | 必须在 finally 中 release，防止异常导致许可证泄漏永远无法获取 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

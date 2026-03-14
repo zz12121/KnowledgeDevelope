@@ -312,3 +312,8 @@ public void run() {
 | volatile 能保证原子性吗 | 不能！只保证可见性和有序性（禁止重排序）；i++ 这类复合操作需要 synchronized 或原子类 |
 | DCL 为什么需要 volatile | 防止 `instance = new Singleton()` 的指令重排序，避免其他线程拿到未初始化对象 |
 | 重排序有哪几种 | 编译器优化重排、CPU 指令并行重排、内存系统（缓存）重排 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/11、内存模型与可见性|11、内存模型与可见性]]

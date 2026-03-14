@@ -337,3 +337,8 @@ void redo() {
 | node(index) 的优化 | 折半查找，index < size/2 从头遍历，否则从尾遍历，最多遍历 n/2 步 |
 | 为什么不推荐用 LinkedList 作队列 | ArrayDeque 无锁 + 数组存储，缓存友好，性能更好 |
 | LinkedList 的内存开销 | 每个节点约 28~32 字节，是 ArrayList 的 7-8 倍 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]

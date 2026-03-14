@@ -318,3 +318,8 @@ String result = list.stream().collect(Collectors.joining(", ", "[", "]"));
 | StringBuilder vs StringBuffer | 前者单线程高性能，后者线程安全（方法加 synchronized）|
 | 为什么 String 可以做 HashMap key | 不可变 → hashCode 稳定且可缓存，天然线程安全 |
 | JDK 9 的 Compact Strings | Latin-1 字符用 byte 存储，节省约一半内存 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/05、String 与常用类|05、String 与常用类]]

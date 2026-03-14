@@ -334,3 +334,8 @@ size = baseCount + sum(counterCells)
 | 为什么不允许 null | 多线程环境下 get(null)==null 有歧义（不存在 vs 值为 null）|
 | size() 准确吗 | 近似值，通过 baseCount + counterCells 汇总，不是强一致 |
 | 如何实现精确计数 | 使用 `mappingCount()`（返回 long）比 `size()`（返回 int）更准确，但仍是近似 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/07、并发集合|07、并发集合]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/08、并发集合|并发-08、并发集合]]

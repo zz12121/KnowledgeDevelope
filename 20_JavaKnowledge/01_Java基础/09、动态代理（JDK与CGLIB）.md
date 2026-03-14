@@ -293,3 +293,8 @@ proxy.updateStock();
 | Spring 什么时候用 JDK，什么时候用 CGLIB | Spring Boot 2.0+ 默认用 CGLIB；也可通过 proxyTargetClass 配置 |
 | 代理方法内部调用自身方法为什么失效 | `this` 是目标对象本身，不是代理对象，调用不经过 AOP 拦截 |
 | InvocationHandler 中为何需要解包 InvocationTargetException | `method.invoke()` 将目标方法抛出的异常包装成 InvocationTargetException，需要取 getCause() |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/14、代理|14、代理]]

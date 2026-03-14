@@ -335,3 +335,8 @@ CompletableFuture 内部维护：
 
 **Q：为什么生产环境不推荐用 commonPool？**
 > commonPool 并行度 = CPU-1，适合纯 CPU 计算。IO 阻塞任务会占满线程，影响并行流等其他使用 commonPool 的组件，甚至导致整个应用响应下降。
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

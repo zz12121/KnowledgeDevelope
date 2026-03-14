@@ -1,73 +1,162 @@
 ###### 1. 常用的 JVM 参数有哪些？
-这些参数用于控制 JVM 如何分配和管理内存，是调优的基石。
 
-| 参数                           | 作用                          | 示例与说明                                                 |
-| ---------------------------- | --------------------------- | ----------------------------------------------------- |
-| **-Xms**​                    | 设置 **堆内存的初始大小**​。           | `-Xms2g`(设置为 2GB)。建议与 `-Xmx`设置相同，避免运行时动态调整带来性能波动。     |
-| **-Xmx**​                    | 设置 **堆内存的最大大小**​。           | `-Xmx4g`(设置为 4GB)。不应超过可用物理内存，否则会触发系统交换，严重影响性能。        |
-| **-Xmn**​                    | 设置 **新生代的大小**​。             | `-Xmn1g`。官方推荐约为整个堆大小的 1/4 到 1/3。                      |
-| **-Xss**​                    | 设置 **每个线程的栈大小**​。           | `-Xss1m`。设置过小可能导致 `StackOverflowError`，过大则会限制可创建的线程数。 |
-| **-XX:MetaspaceSize**​       | 设置 **元空间**​ 的初始容量 (JDK 8+)。 | `-XX:MetaspaceSize=256m`。触发 Full GC 的阈值。              |
-| **-XX:MaxMetaspaceSize**​    | 设置 **元空间**​ 的最大容量 (JDK 8+)。 | `-XX:MaxMetaspaceSize=512m`。默认无限制，但受系统内存约束。           |
-| **-XX:MaxDirectMemorySize**​ | 设置 **直接内存**（堆外内存）的最大容量。     | `-XX:MaxDirectMemorySize=1g`。默认与 `-Xmx`相等。            |
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+JVM 参数分几类，调优时最常用的：
+
+**堆内存设置**：
+- `-Xms2g`：堆初始大小2GB，**建议和 -Xmx 设成相同值**，避免堆动态扩展带来的性能波动（GC 会暂停用户线程来扩容）
+- `-Xmx4g`：堆最大大小4GB，不要设超过机器可用物理内存，否则会触发系统 Swap，性能急剧下降
+- `-Xmn1g`：新生代大小，建议为总堆的1/4到1/3
+- `-Xss1m`：每个线程的栈大小，设小了容易 StackOverflowError，设大了限制可创建的线程数量
+
+**元空间**：
+- `-XX:MetaspaceSize=256m`：元空间初始大小，也是触发 Full GC 的阈值
+- `-XX:MaxMetaspaceSize=512m`：元空间上限，默认无限制，**强烈建议设置**，防止类加载失控把系统内存耗光
+
+**其他**：
+- `-XX:MaxDirectMemorySize=1g`：直接内存（堆外内存）上限，默认和 -Xmx 相同
 
 ###### 3. 如何设置新生代和老年代的比例？
-- **-XX:NewRatio**：控制新生代与老年代的比例。例如 `-XX:NewRatio=3`表示老年代:新生代 = 3:1，即新生代占堆的 1/4。
-- **-XX:SurvivorRatio**：控制 Eden 区与一个 Survivor 区的比例。例如 `-XX:SurvivorRatio=8`表示 Eden:S0:S1 = 8:1:1。
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#二、JVM 常用参数|📖]]
+- `-XX:NewRatio=3`：老年代:新生代 = 3:1，即新生代占整个堆的1/4。值越大老年代越大。
+- `-XX:SurvivorRatio=8`：Eden:S0:S1 = 8:1:1。Eden 占新生代的8/10，两个 Survivor 各占1/10。
+
+经验规则：**短生命周期对象多的应用**（典型 Web 服务）适当增大新生代；**长期存活对象多的应用**（大量缓存）适当减小新生代增大老年代。
+
 ###### 4. 什么是 -XX:+UseCompressedOops？什么是 -XX:+UseCompressedClassPointers？
-指针压缩技术这是 64 位 JVM 上减少内存占用的重要技术。
-- **-XX:+UseCompressedOops**：启用**普通对象指针压缩**。在 64 位系统中，一个引用指针原本占 8 字节，开启后压缩为 4 字节，显著节省堆内存。该参数在 JDK 6 之后默认开启。
-- **-XX:+UseCompressedClassPointers**：启用**类指针压缩**。压缩对象头中指向类元数据的指针。**注意**：此参数依赖于 `UseCompressedOops`，必须在 `UseCompressedOops`开启时才能生效。
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#三、堆内存调优|📖]]
+这是64位 JVM 上减少内存占用的指针压缩技术：
+
+**-XX:+UseCompressedOops（普通对象指针压缩）**：在64位系统中，对象引用原本占8字节，开启后压缩为4字节，对象头里的引用也压缩，显著节省堆内存（通常节省20-30%）。JDK 6u23 之后默认开启，堆不超过32GB时有效。
+
+**-XX:+UseCompressedClassPointers（类指针压缩）**：压缩对象头中指向类元数据的指针。依赖 UseCompressedOops，必须先开启 UseCompressedOops 才能生效，两者通常一起开启。
+
 ###### 6. 如何开启 GC 日志？
-日志是分析 GC 行为和进行调优的根本依据。
 
-| 参数                                   | 作用                                     |
-| ------------------------------------ | -------------------------------------- |
-| **-Xloggc:<file>**​                  | 指定 GC 日志文件的输出路径。                       |
-| **-XX:+PrintGC**​                    | 输出简单的 GC 日志。                           |
-| **-XX:+PrintGCDetails**​             | 输出**详细的 GC 日志**（包括各区内存变化、耗时等），这是分析的关键。 |
-| **-XX:+PrintGCDateStamps**​          | 在 GC 日志中输出**日期时间戳**，便于定位。              |
-| **-XX:+PrintGCTimeStamps**​          | 在 GC 日志中输出**相对于 JVM 启动的时间戳**​。         |
-| **-XX:+HeapDumpOnOutOfMemoryError**​ | 在发生 **OOM 时自动生成堆转储文件**，用于事后分析内存泄漏。     |
-| **-XX:HeapDumpPath=<path>**​         | 指定堆转储文件的生成路径。                          |
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#五、实战案例|📖]]
+GC 日志是调优的根本依据，线上应用必须开启：
 
-| 收集器              | 启用参数                      | 关键调优参数                                                                |
-| ---------------- | ------------------------- | --------------------------------------------------------------------- |
-| **Serial GC**​   | `-XX:+UseSerialGC`        | 适用于客户端或微服务场景。                                                         |
-| **Parallel GC**​ | `-XX:+UseParallelGC`      | `-XX:ParallelGCThreads`（GC线程数）`,`-XX:MaxGCPauseMillis`（最大暂停时间目标）。     |
-| **CMS GC**​      | `-XX:+UseConcMarkSweepGC` | `-XX:CMSInitiatingOccupancyFraction`（触发回收的老年代占用率）。                    |
-| **G1 GC**​       | `-XX:+UseG1GC`            | `-XX:MaxGCPauseMillis`, `-XX:InitiatingHeapOccupancyPercent`（IHOP阈值）。 |
-| **Z GC**​        | `-XX:+UseZGC`             | `-XX:MaxGCPauseMillis`。                                               |
+**JDK 8 及之前**：
+- `-Xloggc:/logs/gc.log`：GC 日志输出到文件
+- `-XX:+PrintGCDetails`：详细 GC 信息（各内存区域变化、耗时）
+- `-XX:+PrintGCDateStamps`：输出日期时间戳
+- `-XX:+HeapDumpOnOutOfMemoryError`：OOM 时自动生成堆转储文件
+- `-XX:HeapDumpPath=/logs/dump.hprof`：堆转储文件路径
+
+**JDK 9+ 统一了日志系统**（推荐）：
+```
+-Xlog:gc*:file=/logs/gc.log:time,uptime,level,tags:filecount=10,filesize=100m
+```
+
+**常用收集器的启用参数**：
+- `-XX:+UseG1GC`（G1，JDK 9+ 默认服务端）
+- `-XX:+UseZGC`（ZGC，低延迟）
+- `-XX:+UseParallelGC`（Parallel，高吞吐，JDK 8 默认）
+- `-XX:+UseConcMarkSweepGC`（CMS，已过时）
+
+**G1 关键调优参数**：
+- `-XX:MaxGCPauseMillis=200`：目标最大停顿时间（默认200ms）
+- `-XX:InitiatingHeapOccupancyPercent=45`：触发并发 GC 的堆占用率阈值
+
 ###### 7. 如何分析 GC 日志？
-开启详细 GC 日志后，可以使用专业的日志分析工具（如 **GCViewer**, **gceasy.io**）来可视化分析以下关键指标：
-- **GC 频率与暂停时间**：Young GC 和 Full GC 发生的次数和平均/最大暂停时间。
-- **内存回收效果**：每次 GC 后，各内存区域（Eden, Survivor, Old）的空间变化。
-- **分配/提升速率**：应用分配内存的速率，以及对象从年轻代提升到老年代的速率。通过分析这些指标，可以判断当前内存设置是否合理，以及是否存在内存泄漏等问题。
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#三、堆内存调优|📖]]
+可以用专业工具可视化分析，推荐 **GCViewer** 或在线工具 **gceasy.io**，把 GC 日志文件上传上去就能看报告。
+
+关注的核心指标：
+
+- **GC 频率**：Minor GC 多久一次，Full GC 多久一次，Full GC 太频繁（每分钟多次）是警报
+- **停顿时间**：每次 GC 的 STW 时间，P99 停顿是否满足业务要求
+- **内存回收效果**：GC 后老年代还有多少，是否在稳定区间而不是持续增长
+- **对象提升速率**：对象从新生代晋升到老年代的速度，速率过高说明新生代太小或者有大量中长生命周期对象
+- **分配速率**：内存分配速率过高容易触发频繁 Minor GC
+
 ###### 8. 什么是安全点（Safepoint）？
-**安全点**：指在代码执行过程中，**线程的状态是确定的**，并且所有对象引用关系已知的点。JVM 在进行某些操作（如 GC 的根枚举）时，需要暂停所有用户线程（STW），这个暂停必须发生在安全点。循环末尾、方法调用后、异常抛出点等通常会设置安全点。
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+安全点是程序执行过程中**线程状态确定、所有对象引用关系已知**的特定位置。JVM 在需要让所有线程暂停时（STW），不会在任意位置强行暂停，而是让线程运行到最近的安全点才停下来。
+
+什么地方会设置安全点：方法调用、循环末尾、异常抛出点等控制流转移的地方。
+
+JVM 发起 STW 时，运行中的线程会在最近的安全点停下，休眠/阻塞的线程不需要走到安全点（它们处于安全区域），等所有线程都到位了，GC 才真正开始工作。
+
 ###### 9. 什么是安全区域（Safe Region）？
-指**在一段代码片段中，引用关系不会发生变化**。在这个区域内的任意地方开始 GC 都是安全的。对于处于休眠或阻塞状态的线程，它们无法主动响应 JVM 的中断请求走到安全点，这些线程就位于安全区域内，GC 时可以忽略它们。
-###### 10. 如何优化JVM的内存分配？
-1. **合理设置堆大小**：`-Xms`和 `-Xmx`设置为相同值，避免堆震荡。初始堆大小建议为物理内存的 1/2 到 2/3，但需为系统和其他程序留出空间。
-2. **优化新生代**：根据对象存活率调整新生代占比。**短期对象多**的应用可适当增大新生代（`-Xmn`）；**长期对象多**的应用可适当减小新生代，增大老年代。
-3. **调整 Survivor 区**：通过 `-XX:SurvivorRatio`调整。观察 GC 日志中对象年龄分布，避免对象过早晋升到老年代。
-4. **避免大对象**：可使用 `-XX:PretenureSizeThreshold`设置对象阈值，大于此值的对象直接在老年代分配，避免在新生代来回拷贝。
-###### 11. 如何优化JVM的垃圾回收性能？
-1. **选择合适的 GC**：根据应用特性（低延迟或高吞吐）和硬件资源选择垃圾收集器。
-2. **目标暂停时间**：对 G1 或 ZGC，使用 `-XX:MaxGCPauseMillis`设置合理的停顿时间目标。设置过小会导致 GC 频率增高，反而降低吞吐量。
-3. **GC 线程数**：通过 `-XX:ParallelGCThreads`设置并行 GC 的线程数，通常不应超过 CPU 核心数。
-4. **降低 Full GC**：优化代码避免内存泄漏、合理设置堆大小和老年代 GC 触发阈值，是减少耗时严重的 Full GC 的关键。
-###### 12. 如何监控JVM的运行状态？
-- **命令行工具**：使用 `jps`查看 Java 进程，`jstat`查看内存和 GC 实时统计信息，`jstack`查看线程栈，`jmap`查看堆内存详情或生成堆转储。
-- **图形化工具**：**JConsole**​ 和 **VisualVM**​ 是 JDK 自带的图形化监控工具，可以直观查看堆内存使用、线程、类加载等信息。
-- **APM 工具**：生产环境可考虑使用 **Prometheus**​ + **Grafana**​ 等专业应用性能监控系统进行全方位监控和告警。
-###### 13. 如何解决JVM内存泄漏问题？如何处理JVM的OOM问题？
-1. **定位问题**：在启动参数中添加 `-XX:+HeapDumpOnOutOfMemoryError`和 `-XX:HeapDumpPath`，以便在 OOM 时自动生成堆转储文件。
-2. **分析堆转储**：使用 **Eclipse Memory Analyzer Tool**​ 等工具分析转储文件，查找占用内存最大的对象和其 GC Roots 引用链，从而定位泄漏点。
-3. **代码修复**：检查集合类使用、监听器或回调函数注册、单例模式等常见泄漏场景，确保无用对象能被正常回收。
-###### 15. 如何处理JVM的Full GC问题？
-频繁的 Full GC 通常由以下原因导致，需结合 GC 日志和堆转储分析：
-- **老年代空间不足**：对象提升过快，可能是年轻代过小或 `-XX:MaxTenuringThreshold`设置过小。
-- **内存泄漏**：对象无法被回收，老年代逐渐被填满。
-- **显式调用 System.gc()**：可通过 `-XX:+DisableExplicitGC`禁用，但需确保第三方库不会依赖此调用。
-- **元空间不足**：适当调大 `-XX:MaxMetaspaceSize`。
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+安全区域是一段**引用关系不会发生变化**的代码区间，比如线程阻塞在 I/O 操作、sleep、wait 时。
+
+为什么需要安全区域：睡眠或阻塞的线程无法主动跑到安全点响应 STW 请求。但这些线程本身也不在修改引用关系，所以 GC 可以直接忽略它们，把这些线程所在的代码区间视为安全区域，不需要等它们到安全点。
+
+线程在进入安全区域前会标记自己进入了安全区域，GC 就不会等它了。线程要离开安全区域时，需要检查 JVM 是否正在 GC，如果是就等 GC 完成再继续。
+
+###### 10. 如何优化 JVM 的内存分配？
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+1. **Xms = Xmx**：避免堆动态扩展，减少 GC 暂停
+2. **合理设置新生代大小**：短期对象多的应用增大新生代（`-Xmn`），减少 Minor GC 后对象晋升
+3. **调整 Survivor 比例**：通过 GC 日志查看对象年龄分布，如果发现对象年龄还小就大量晋升老年代，需要调整 `-XX:MaxTenuringThreshold` 或 `-XX:SurvivorRatio`
+4. **避免大对象频繁创建**：配置 `-XX:PretenureSizeThreshold`，大对象直接进老年代，避免在新生代来回复制
+
+###### 11. 如何优化 JVM 的垃圾回收性能？
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+1. **选对 GC**：根据应用特性选（见第5题的选型指南）
+2. **设合理的停顿目标**：G1 的 `-XX:MaxGCPauseMillis` 不要设太小，否则 GC 频率会提高，吞吐量反而下降
+3. **GC 线程数合理**：`-XX:ParallelGCThreads` 不要超过 CPU 核心数，否则 GC 线程本身会抢占业务线程
+4. **减少 Full GC**：优化代码避免内存泄漏、合理设置堆大小、老年代 GC 触发阈值不要太低
+
+###### 12. 如何监控 JVM 的运行状态？
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+**命令行工具**（线上快速排查）：
+- `jps`：查看所有 Java 进程及其 PID
+- `jstat -gcutil <pid> 1000`：每秒打印一次 GC 统计信息（各区使用率、GC 次数和耗时）
+- `jstack <pid>`：打印所有线程栈信息，排查线程死锁和死循环用
+- `jmap -heap <pid>`：查看堆内存使用情况
+- `jmap -dump:format=b,file=heap.hprof <pid>`：生成堆转储文件
+
+**图形化工具**：
+- **JConsole**：JDK 自带，连接 JVM 进程，实时查看堆内存、线程、类加载等
+- **VisualVM**：JDK 自带（JDK 9 后独立发布），功能更强，支持 Profiling 和 Heap Dump 分析
+
+**生产监控**：Prometheus + Grafana + JVM Exporter 做长期趋势监控和告警；**Arthas** 做在线诊断（不重启 JVM 动态 trace 方法、查看类信息等）。
+
+###### 13. 如何解决 JVM 内存泄漏问题？如何处理 JVM 的 OOM 问题？
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+**第一步：提前配置 OOM 自动 dump**（线上一定要配）：
+```
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/logs/heap-dump.hprof
+```
+
+**第二步：复现并获取 Heap Dump**：如果已经配了上面的参数，OOM 时会自动生成；也可以用 `jmap` 手动 dump 一份当前堆的快照。
+
+**第三步：用 MAT（Memory Analyzer Tool）分析**：
+- 看 "Leak Suspects" 报告，MAT 会自动识别最可能的泄漏点
+- 找占用内存最大的对象及其 GC Roots 引用链，顺着引用链找到谁"抓着不放"
+
+**常见内存泄漏场景**：
+- 集合类（Map、List）持有对象引用，但不及时清理（比如全局缓存没有过期机制）
+- 监听器、回调注册了但没有注销
+- 数据库连接、文件流等资源没有 close
+- ThreadLocal 在线程池中使用后没有 remove
+
+###### 15. 如何处理 JVM 的 Full GC 问题？
+
+[[../../../20_JavaKnowledge/04_JVM/09、JVM调优实战#一、调优目标与原则|📖]]
+频繁 Full GC 说明有问题，排查思路：
+
+**1. 看 GC 日志**：确认 Full GC 的触发原因（日志里会有提示）和频率。
+
+**2. 老年代增长过快**：可能是对象提升速率过高（新生代太小），或者有内存泄漏。用 `jstat -gcutil` 监控老年代使用率是否持续增长，增长不停就是泄漏。
+
+**3. 大对象直接进老年代**：检查是否有超大对象（大数组、大 Map 等），考虑拆分或延迟加载。
+
+**4. 元空间不足**：调大 `-XX:MaxMetaspaceSize`，或者检查是否有类加载失控（大量动态代理、框架反射）。
+
+**5. 代码里显式调用 System.gc()**：找到并去掉，或者用 `-XX:+DisableExplicitGC` 禁用。
+
+**6. CMS 的并发失败（Concurrent Mode Failure）**：CMS 并发清理期间老年代满了，退化为 Serial Old 做 Full GC，停顿时间暴增。解决：适当降低 CMSInitiatingOccupancyFraction（提前触发 CMS），或者换 G1。

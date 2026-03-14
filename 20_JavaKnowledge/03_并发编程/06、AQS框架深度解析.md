@@ -457,3 +457,8 @@ class SimpleMutex implements Lock {
 | 为什么 unparkSuccessor 从尾部向前找 | 节点入队时先设 prev 再设 next（非原子），从后向前遍历更安全 |
 | Condition 和 Object 监视器的区别 | Condition 支持多个等待队列，支持不可中断等待和精确唤醒 |
 | AQS 的设计模式 | 模板方法模式，骨架由 AQS 提供，状态语义由子类定义 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/05、AQS（AbstractQueuedSynchronizer）|05、AQS]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]

@@ -222,9 +222,127 @@ long total = adder.sum();           // 近似总和
 long totalAndReset = adder.sumThenReset(); // 获取并重置（原子操作）
 ```
 
+## 五、Unsafe 类深度解析
+
+`Unsafe` 是 Java 实现 CAS 的底层入口，位于 `sun.misc.Unsafe`（JDK 9+ 迁移到 `jdk.internal.misc.Unsafe`）。
+
+### 5.1 如何获取 Unsafe
+
+```java
+// 方法1：反射获取（测试/框架层用）
+Field f = Unsafe.class.getDeclaredField("theUnsafe");
+f.setAccessible(true);
+Unsafe unsafe = (Unsafe) f.get(null);
+
+// 方法2：JDK 9+ 用 VarHandle（推荐，见下节）
+```
+
+### 5.2 Unsafe 的核心能力
+
+```java
+// 1. CAS 操作（AtomicXxx 的基础）
+unsafe.compareAndSwapInt(obj, offset, expected, update);
+unsafe.compareAndSwapLong(obj, offset, expected, update);
+unsafe.compareAndSwapObject(obj, offset, expected, update);
+
+// 2. 内存操作（直接读写内存）
+unsafe.allocateMemory(size);          // 堆外内存分配
+unsafe.freeMemory(address);           // 释放堆外内存
+unsafe.putLong(address, value);       // 写入堆外内存
+unsafe.getLong(address);              // 读取堆外内存
+
+// 3. 获取字段内存偏移量
+long offset = unsafe.objectFieldOffset(MyClass.class.getDeclaredField("value"));
+// AtomicInteger.VALUE 就是通过 objectFieldOffset 获取的
+
+// 4. park/unpark（LockSupport 的底层）
+unsafe.park(false, 0L);        // 挂起当前线程
+unsafe.unpark(thread);         // 恢复线程
+
+// 5. 绕过构造函数创建对象（序列化框架用）
+MyClass obj = (MyClass) unsafe.allocateInstance(MyClass.class);
+```
+
+### 5.3 VarHandle（JDK 9+，Unsafe 的官方替代）
+
+```java
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+
+class Counter {
+    volatile int value = 0;
+    
+    // 获取 VarHandle
+    private static final VarHandle VALUE_HANDLE;
+    static {
+        try {
+            VALUE_HANDLE = MethodHandles.lookup()
+                .findVarHandle(Counter.class, "value", int.class);
+        } catch (Exception e) {
+            throw new Error(e);
+        }
+    }
+    
+    // CAS 操作（等价于 AtomicInteger.compareAndSet）
+    public boolean cas(int expected, int update) {
+        return VALUE_HANDLE.compareAndSet(this, expected, update);
+    }
+    
+    // getAndAdd
+    public int getAndAdd(int delta) {
+        return (int) VALUE_HANDLE.getAndAdd(this, delta);
+    }
+}
+
+// VarHandle 相比 Unsafe 的优势：
+// 1. 类型安全（编译期检查）
+// 2. 模块系统友好（JDK 9 强模块化后 Unsafe 访问受限）
+// 3. 支持 volatile/plain/opaque/acquire/release 多种内存访问语义
+```
+
 ---
 
-## 五、面试要点速查
+## 六、LongAdder 内部实现细节
+
+```java
+// LongAdder 继承自 Striped64，核心数据结构：
+abstract class Striped64 {
+    @Contended static final class Cell {
+        volatile long value;
+        // @Contended：防止伪共享，每个 Cell 独占一个缓存行
+    }
+    
+    transient volatile Cell[] cells;  // Cell 数组，大小是 2 的幂
+    transient volatile long base;     // 无竞争时的基础值
+    transient volatile int cellsBusy; // 初始化/扩容 Cell 数组时的自旋锁
+}
+```
+
+```
+LongAdder.add(x) 流程：
+
+1. 尝试 CAS 更新 base（无竞争路径，最快）
+   → 成功：返回
+   → 失败（有竞争）：进入 cells 路径
+
+2. 获取当前线程的 probe（线程本地探针哈希值）
+   计算 cells[probe & (cells.length - 1)] → 目标 Cell
+
+3. 尝试 CAS 更新目标 Cell.value
+   → 成功：返回
+   → 失败（此 Cell 竞争激烈）：
+
+4. 扩容 cells 数组（double size），更换 probe 重新散列
+   → 直到 CAS 成功
+
+sum() = base + Σ cells[i].value
+  ⚠️ sum() 是近似值！计算期间其他线程可能还在 add()
+  sumThenReset() 则先获取总值再清零（也非严格原子）
+```
+
+---
+
+## 七、面试要点速查
 
 | 问题 | 要点 |
 |------|------|
@@ -234,3 +352,8 @@ long totalAndReset = adder.sumThenReset(); // 获取并重置（原子操作）
 | AtomicLong 和 LongAdder 的区别 | LongAdder 分散竞争到多个 Cell，高并发写性能更好；但 sum() 是近似值 |
 | Unsafe 的作用 | 提供直接操作内存的能力，CAS 操作底层都依赖 Unsafe.compareAndSwapXxx |
 | CAS 和 synchronized 怎么选 | 竞争不激烈选 CAS（乐观锁，无阻塞）；竞争激烈选 synchronized（避免大量自旋）|
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/09、原子类|09、原子类]]

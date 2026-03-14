@@ -344,3 +344,8 @@ Map.Entry<Long, String> route = routeTable.floorEntry(targetIP);
 | 红黑树 vs AVL 树 | 红黑树弱平衡，旋转次数少，适合频繁增删；AVL 严格平衡，查找略快，适合读多 |
 | NavigableMap 的优势 | 提供 floor/ceiling/higher/lower、subMap/headMap/tailMap 等范围操作 |
 | TreeMap 适合什么场景 | 有序遍历、范围查询（如统计某区间的数据）、排行榜 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/06、比较器与排序|06、比较器与排序]]

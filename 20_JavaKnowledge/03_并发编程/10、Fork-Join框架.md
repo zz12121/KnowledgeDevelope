@@ -307,3 +307,8 @@ task.join();  // 直接抛出原始异常（RuntimeException/Error）
 
 **Q：并行流默认线程数是多少？**
 > `ForkJoinPool.commonPool` 的并行度 = `Runtime.getRuntime().availableProcessors() - 1`，可通过 `-Djava.util.concurrent.ForkJoinPool.common.parallelism=N` 调整。
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

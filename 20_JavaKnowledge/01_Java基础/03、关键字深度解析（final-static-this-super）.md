@@ -306,3 +306,8 @@ void method() {
 | this() 和 super() 能同时出现 | 不能，两者都要求在构造器第一行，只能二选一 |
 | static 内部类和内部类的区别 | static 内部类不持有外部类引用，可单独实例化，不会导致外部类内存泄漏；非 static 内部类持有外部类引用 |
 | final 方法比普通方法快吗 | final 方法更容易被 JIT 内联，但现代 JIT 即使没有 final 也能通过逃逸分析实现内联 |
+
+
+---
+
+**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/04、关键字与运算符|04、关键字与运算符]]

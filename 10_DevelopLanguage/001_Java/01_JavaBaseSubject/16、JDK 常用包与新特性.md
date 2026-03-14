@@ -1,60 +1,115 @@
-###### 1. 熟悉 JDK 哪些包？⁠⁠​
-JDK提供了丰富的标准库（包），它们是Java开发的基石。除了表格中提到的核心包，这里再做一些强调和补充：
-- **`java.lang`**：这是最核心的包，**默认会被自动导入**。它包含了程序运行的基础，如`Object`、`String`、`Math`、`Thread`和基本数据类型的包装类（如`Integer`）。
-- **`java.util`**：这是工具类的宝库，尤其是**集合框架（Collection Framework）**，如`List`、`Set`、`Map`及其常用实现（`ArrayList`、`HashMap`）是日常开发中使用最频繁的。此外，还包括日期时间（旧版）、随机数、扫描器等实用工具。
-- **`java.io`与 `java.nio`**：`java.io`提供了标准的输入输出流，用于文件读写和数据流处理。`java.nio`（New I/O）则提供了更高效、非阻塞的I/O操作方式，适用于网络和高并发场景。
-- **`java.time`(JDK 8+)**：这是JDK 8引入的新的日期和时间API，彻底解决了旧版`java.util.Date`和`Calendar`类的设计缺陷，强烈推荐使用。
-- **其他重要包**：`java.net`（网络编程）、`java.sql`（数据库连接）、`java.util.concurrent`（并发编程）等都是特定领域开发必须掌握的。
-###### 2. JDK 1.8 有哪些新特性？⁠⁠​
-- **Lambda 表达式**：这是对函数式编程范式的支持，极大地简化了代码，尤其是在遍历集合和实现回调接口时。其语法为 `(参数) -> 表达式`或 `(参数) -> { 语句块 }`。
-- **Stream API**：提供了一种高效处理数据集合的声明式编程模型。它可以让你通过流水线式的操作（过滤、映射、归约等）来处理集合，并且能透明地利用多核架构进行并行计算，极大提升了代码的可读性和处理效率。
-- **方法引用**：是Lambda表达式的一种语法糖，让你可以直接通过类名或实例名来引用已有的方法，使得代码更加简洁，例如 `System.out::println`。
-- **接口的默认方法和静态方法**：允许在接口中提供具有实现的方法。**默认方法**使得在不破坏现有实现类的情况下对接口进行扩展成为可能；**静态方法**允许为接口定义工具方法。
-- **新的日期时间 API (`java.time`)**：引入了 `LocalDate`、`LocalTime`、`LocalDateTime`等不可变类，线程安全且设计清晰，完美替代了易错的旧日期API。
-- **Optional 类**：一个用于包装可能为`null`值的容器类，旨在强制开发者显式地检查值是否存在，从而避免空指针异常，写出更健壮的代码。
-###### 3. Java 8-22 新特性总结?⁠⁠​
-Java版本迭代迅速，以下是后续LTS（长期支持）版本和一些重要版本的核心特性摘要：
-- **Java 11 (LTS)**：
-    - **局部变量类型推断 (`var`)**：允许使用 `var`声明局部变量，编译器会自动推断类型，减少代码冗余。
-    - **标准HTTP客户端**：将Java 9/10中孵化的HTTP客户端API标准化，支持HTTP/2和WebSocket，易用且功能强大。
-    - **字符串API增强**：新增了如 `isBlank()`、`lines()`、`repeat()`等实用方法。
-- **Java 17 (LTS)**：
-    - **密封类（Sealed Classes）**：允许类或接口明确规定哪些其他类或接口可以扩展或实现它，提供了对继承关系更精确的控制。
-    - **文本块（Text Blocks）**：简化了多行字符串的书写，无需大量的转义和连接操作。
-- **Java 21 (LTS) - 又一个重大更新：
-    - **虚拟线程（Virtual Threads）**：这是Project Loom的成果，是极其轻量的线程，可以大幅降低编写、维护和观测高吞吐量并发应用程序的难度，是并发编程模型的重大革新。
-    - **记录模式（Record Patterns）**：增强了对记录类（Record，Java 16引入）的解构能力，可以更方便地分解记录对象的数据。
-    - **序列化集合（Sequenced Collections）**：为集合定义了新的接口，明确提供了获取首尾元素的方法。
+###### 1. 熟悉 JDK 哪些包？
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#一、JDK 8（2014，里程碑版本）|📖]]
+JDK自带的标准库很丰富，面试最常考的几个包：
+
+**`java.lang`**：最核心的包，**自动导入不需要import**。包含Object、String、Math、Thread、基本类型包装类（Integer等）。几乎任何Java程序都会用到。
+
+**`java.util`**：工具类宝库。最重要的是**集合框架**（List、Set、Map及其实现类）、日期时间（旧版Date/Calendar）、Scanner、Random等。日常开发里`java.util`的东西用得最多。
+
+**`java.io`和`java.nio`**：IO操作。java.io提供流式IO，java.nio提供非阻塞IO，nio性能更好适合高并发网络场景。
+
+**`java.time`**（JDK 8+）：新日期时间API，`LocalDate`、`LocalDateTime`、`ZonedDateTime`等，不可变、线程安全、设计优雅，完全替代旧版Date/Calendar，**现在的项目一律用这个**。
+
+**`java.util.concurrent`**：并发编程工具箱，线程池、锁、并发集合、CountDownLatch等都在这里。并发编程必学。
+
+**`java.net`**：网络编程；`java.sql`：数据库连接；`java.lang.reflect`：反射。
+
+###### 2. JDK 1.8 有哪些新特性？
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#一、JDK 8（2014，里程碑版本）|📖]]
+Java 8是划时代的版本，这些特性改变了Java编程方式：
+
+**Lambda表达式**：用`(参数) -> 表达式`的方式简洁地实现函数式接口，代替冗长的匿名内部类。
+
+```java
+// 以前
+Collections.sort(list, new Comparator<String>() {
+    public int compare(String a, String b) { return a.compareTo(b); }
+});
+// Java 8
+Collections.sort(list, (a, b) -> a.compareTo(b));
+```
+
+**Stream API**：对集合进行声明式、流水线式操作，可以链式调用filter/map/reduce等，还支持并行流处理。
+
+```java
+list.stream().filter(s -> s.length() > 3).map(String::toUpperCase).collect(Collectors.toList());
+```
+
+**方法引用**：Lambda的简化写法，直接引用已有方法：`System.out::println`、`String::valueOf`。
+
+**接口默认方法和静态方法**：接口可以有`default`方法（带实现），让接口可以在不破坏现有实现类的情况下增加新方法，解决了接口扩展的历史难题。
+
+**新日期时间API（java.time）**：`LocalDate`、`LocalTime`、`LocalDateTime`，不可变线程安全，替代混乱的旧版Date/Calendar。
+
+**Optional类**：用来包装可能为null的值，强制调用方显式处理空值，减少NPE。
+
+###### 3. Java 8-21 新特性总结？
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#六、JDK 21（LTS，2023）|📖]]
+**Java 11（LTS）**：`var`局部变量类型推断（编译器自动推断类型，少写类型声明）；标准HTTP Client API，支持HTTP/2；字符串新方法`isBlank()`、`lines()`、`repeat(n)`。
+
+**Java 14/15**：`instanceof`模式匹配（`if (obj instanceof String s)`，检查和转型一步完成）；文本块（`"""`多行字符串，告别字符串拼接地狱）；Records记录类（不可变数据类，自动生成equals/hashCode/toString）。
+
+**Java 17（LTS）**：密封类（`sealed class`，明确限制哪些子类可以继承，让继承体系更可控）；文本块、switch表达式、模式匹配正式发布。
+
+**Java 21（LTS，重大版本）**：虚拟线程（Project Loom，极轻量的线程，百万并发不是梦，彻底改变高并发编程模型）；Sequenced Collections（为集合增加获取首尾元素的标准API）；Record Patterns（对记录类的解构匹配）。
+
 ###### 4. Stream API 的常用操作有哪些？
-Stream的操作分为两类：**中间操作**（返回Stream，可连接）和**终端操作**（返回具体结果或副作用，触发执行）。
-- **常用中间操作**：
-    - `filter(Predicate p)`：过滤元素。
-    - `map(Function f)`：将元素映射为另一种形式。
-    - `sorted()`/ `sorted(Comparator com)`：排序。
-    - `distinct()`：去重。
-- **常用终端操作**：
-    - `forEach(Consumer c)`：遍历每个元素。
-    - `collect(Collector c)`：将流转换为集合（如List、Set、Map）。
-    - `reduce(...)`：将流中的元素反复组合，得到一个值（如求和、求最大）。
-    - `count()`：返回流中元素个数。
-    - `findFirst()`/ `anyMatch(Predicate p)`：查找或匹配元素。
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#一、JDK 8（2014，里程碑版本）|📖]]
+Stream操作分两类：中间操作（返回Stream可以链式调用）和终端操作（产生结果，触发执行）。
+
+**常用中间操作（懒执行，只在终端操作触发时才真正执行）**：
+- `filter(Predicate)` - 过滤，保留满足条件的元素
+- `map(Function)` - 映射，把每个元素转换成另一种形式
+- `flatMap(Function)` - 扁平化映射，把流中的流合并成一个流
+- `sorted()`/`sorted(Comparator)` - 排序
+- `distinct()` - 去重
+- `limit(n)` - 取前n个
+- `skip(n)` - 跳过前n个
+
+**常用终端操作（触发整个流水线执行）**：
+- `collect(Collector)` - 收集结果，转换成List/Set/Map等
+- `forEach(Consumer)` - 遍历
+- `count()` - 统计数量
+- `reduce()` - 归约操作（求和、求积等）
+- `findFirst()`/`findAny()` - 查找元素
+- `anyMatch()`/`allMatch()`/`noneMatch()` - 匹配检查
+- `min()`/`max()` - 找最值
+
 ###### 5. Optional 类的作用是什么？如何使用？
-`Optional`的核心思想不是替换所有的`null`，而是作为一种通信工具，明确表示一个返回值可能为空，强制调用方进行处理。
-- **创建Optional**：
-    - `Optional.of(value)`：创建一个非空值的Optional。
-    - `Optional.ofNullable(value)`：创建一个可能为`null`的Optional。
-    - `Optional.empty()`：创建一个空的Optional。
-- **使用Optional**（应避免直接调用 `get()`，因其在为空时会抛异常）：
-    - `isPresent()`：判断值是否存在。
-    - `ifPresent(Consumer c)`：如果值存在，则执行给定的操作。
-    - `orElse(T other)`：如果值存在则返回，否则返回指定的默认值。
-    - `orElseGet(Supplier other)`：延迟版本的`orElse`，只有在值为空时才调用Supplier。
-    - `orElseThrow(Supplier exceptionSupplier)`：如果值为空，则抛出指定的异常。
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#一、JDK 8（2014，里程碑版本）|📖]]
+Optional不是为了彻底消灭null，而是作为返回值类型，明确表示"这个返回值可能为空"，强制调用方处理空值情况，减少NPE。
+
+**创建**：`Optional.of(value)`（非空值）、`Optional.ofNullable(value)`（可能为空）、`Optional.empty()`。
+
+**使用（避免直接`get()`，它在空时抛异常）**：
+
+```java
+Optional<String> opt = Optional.ofNullable(user.getName());
+
+opt.isPresent();                    // 判断是否有值
+opt.ifPresent(name -> log(name));   // 有值才执行
+opt.orElse("默认值");               // 有值返回，否则返回默认值
+opt.orElseGet(() -> computeDefault()); // 延迟计算默认值
+opt.orElseThrow(() -> new BusinessException("名称不能为空")); // 空则抛异常
+opt.map(String::toUpperCase);       // 映射转换，空时返回empty
+```
+
+最佳实践：主要用作方法返回值类型，不要用在字段或参数上；不要用`Optional.get()`，用上面那些安全的方法。
+
 ###### 6. Lambda 表达式的底层实现原理是什么？
-Lambda表达式的实现并不神秘，它主要依赖于Java 7引入的 `invokedynamic`指令和函数式接口。
-1. **函数式接口**：Lambda表达式需要被赋值给一个**只有一个抽象方法的接口**（函数式接口，如 `Runnable`, `Comparator`）。
-2. **编译时“脱糖”（Desugar）**：在编译阶段，编译器会为Lambda表达式生成一个对应的**静态私有方法**，该方法包含了Lambda体的逻辑。
-3. **`invokedynamic`指令**：字节码中，Lambda表达式出现的位置会被替换为一条 `invokedynamic`指令。这条指令的核心任务是**在首次运行时**动态地解析出应该调用哪个方法（即第2步中生成的静态方法）。
-4. **运行时链接**：当JVM首次执行到 `invokedynamic`指令时，它会调用一个称为“Lambda元工厂”（LambdaMetafactory）的机制。这个工厂会根据Lambda的上下文，动态生成一个实现了目标函数式接口的类，并将这个类的实例（即Lambda对象）与生成的静态方法绑定起来。
-5. **后续调用**：一旦链接完成，后续再执行到该指令时，就会直接调用之前动态生成的类实例，避免了重复的解析和类生成开销。
-这种基于 `invokedynamic`的实现方式非常高效，实现了**按需生成类**，并且具有很好的性能。你可以近似地认为，一个Lambda表达式 `() -> System.out.println("Hello")`最终在运行时等价于一个实现了 `Runnable`接口的匿名内部类，但其实现机制更为优雅和高效。ssh
+
+[[../../../20_JavaKnowledge/01_Java基础/13、JDK新特性全览（8-21）#一、JDK 8（2014，里程碑版本）|📖]]
+Lambda的实现原理不是内部类（尽管效果类似），而是依赖Java 7引入的`invokedynamic`指令：
+
+**编译期**：编译器把Lambda体的逻辑提取成一个私有静态方法，Lambda调用的位置替换成一条`invokedynamic`指令。
+
+**首次运行时**：JVM执行`invokedynamic`时，调用LambdaMetafactory（Lambda元工厂）动态生成一个实现了目标函数式接口的类，并把这个类与之前生成的静态方法绑定，返回一个实例。
+
+**后续调用**：第一次链接完成后缓存结果，后续直接用，不再重复生成类。
+
+这种方式的好处是高效（按需生成，一次生成反复使用）且灵活（将来JVM可以用更好的方式实现，不需要改编译器）。跟匿名内部类相比，不用每次都生成一个新的类文件，也不需要每次都创建对象（对于无状态的Lambda可以复用同一个实例）。
