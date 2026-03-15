@@ -1,90 +1,145 @@
 ###### 1. Dubbo 是什么？它主要解决什么问题？
-1. Dubbo 是一个高性能、轻量级的开源 Java RPC 框架，由阿里巴巴开源，后成为 Apache 顶级项目。它主要解决分布式系统架构中，微服务或服务化架构下的**服务治理**问题。核心目标是提供高性能的透明化远程方法调用，以及完善的服务治理能力。
-    它具体解决的关键问题包括：
-    - **服务透明化调用**：让开发者像调用本地方法一样调用远程服务，Dubbo 底层封装了网络通信、序列化/反序列化等复杂细节。
-    - **服务注册与发现**：服务提供者启动后向注册中心注册自己的地址，消费者从注册中心订阅所需服务，动态感知服务提供者的上线、下线，实现服务的弹性伸缩和故障转移。
-    - **负载均衡**：在多个服务提供者实例间，为消费者调用提供多种负载均衡策略（如随机、轮询、最少活跃调用等），避免单个节点压力过大。
-    - **集群容错**：当调用失败时，提供多种容错机制，如快速失败（Failfast）、失败自动切换（Failover）、失败安全（Failsafe）等，保证系统的可用性和健壮性。
-    - **服务监控与治理**：提供运行时的服务调用统计和监控，以及服务路由、动态配置、服务降级等治理能力。
-从源码角度看，其解决通信问题的核心在于对 `ExchangeClient`、`ExchangeServer`、`Codec`等网络层组件的封装，而服务治理的核心在于 `Registry`、`Cluster`、`Directory`、`Router`、`LoadBalance`等一系列抽象和实现。
-###### 2. Apache Dubbo 与阿里巴巴 Dubbo 有什么区别？
-Apache Dubbo 和阿里巴巴 Dubbo 本质上是同一套核心代码在不同发展阶段和治理模式下的产物。
-- **阿里巴巴 Dubbo**：指 2011-2018 年间阿里巴巴开源并维护的版本。在 2014 年一度暂停维护，后在 2017 年重启。
-- **Apache Dubbo**：2018 年，阿里巴巴将 Dubbo 捐献给了 Apache 软件基金会，项目进入 Apache 孵化器。2019 年成为 Apache 顶级项目。此后发布的版本都称为 Apache Dubbo。
-    主要区别在于：
-- **包名/命名空间**：阿里巴巴版本的包名以 `com.alibaba.dubbo`开头，而 Apache 版本则以 `org.apache.dubbo`开头。这是最直观的代码层面的区别，两者不兼容。
-- **功能演进与生态整合**：Apache Dubbo 在孵化及成为顶级项目后，发展更为迅速和开放。它积极拥抱云原生，加强了对 HTTP/2（gRPC）、Reactive Streams 的支持，提供了对 Kubernetes、Spring Cloud、Dubbo Mesh 等更好的集成能力。同时，社区也更加国际化。
-- **治理与许可证**：Apache Dubbo 遵循 Apache 2.0 许可证，由 Apache 基金会和全球社区共同治理，开发流程更透明。
-###### 3. Dubbo 的核心组件有哪些？
-Dubbo 的核心组件构成了其服务治理体系的基础：
-- **Provider**：服务提供方，暴露服务的服务容器。
-- **Consumer**：服务消费方，调用远程服务的客户端。
-- **Registry**：服务注册与发现中心。Dubbo 支持多种实现，如 Zookeeper、Nacos、Consul、Redis 等。Provider 和 Consumer 都与之交互。
-- **Monitor**：监控中心。用于统计服务调用次数、调用时间等，实现服务治理的可观测性。非强制依赖。
-- **Container**：服务运行容器。负责启动、加载、运行 Provider。例如 Spring Container 是最常用的容器。
-    从代码抽象层面看，核心的 SPI 接口和类包括：`Protocol`（定义通信协议）、`Invoker`（调用执行体）、`Exporter`（暴露的服务）、`ProxyFactory`（创建代理）、`Cluster`（集群容错层）、`LoadBalance`（负载均衡）、`Router`（路由规则）、`RegistryFactory`（注册中心工厂）等。这些组件通过 Dubbo 强大的 SPI 机制进行扩展和组装。
-###### 4. Dubbo 的架构设计是怎样的？
-Dubbo 的架构设计遵循了面向接口和职责分离的原则，整体是一个分层的、模块化的微内核架构。
-- **服务消费者端**：
-    1. `Proxy`层根据服务接口生成一个客户端存根，屏蔽远程调用细节。
-    2. 调用经过 `Filter`链，进行拦截和增强。
-    3. `Cluster`层从 `Directory`获取所有可用的服务提供者 `Invoker`列表，并通过 `Router`进行路由筛选，再通过 `LoadBalance`进行负载均衡，选出一个 `Invoker`。
-        
-    4. 底层由具体的 `Protocol`（如 Dubbo Protocol）将调用信息封装成请求，通过 `ExchangeClient`进行网络传输。
-- **服务提供者端**：
-    1. 网络层 `ExchangeServer`收到请求后，交由 `Protocol`层解码。
-    2. 解码后找到对应的 `Exporter`，进而找到本地真正的服务实现 `Invoker`。
-    3. 调用同样会经过服务提供者端的 `Filter`链。
-    4. 最终调用真实的业务实现，并将结果返回。
-- **注册中心**：作为协调者，Provider 启动时向 Registry 注册，Consumer 订阅服务地址列表。Registry 在 Provider 变更时通知 Consumer 更新本地 `Directory`。
-    这个设计中，`Invoker`是核心模型，在消费者端是远程服务的代理，在提供者端是本地服务的封装。各层之间通过清晰的接口解耦，并通过 SPI 机制允许每层都有多种实现。
-###### 5. 说说 Dubbo 的设计思路
--Dubbo 的设计思路可以概括为 **“面向接口的远程服务调用”**​ 和 **“智能化的服务治理”**。
-1. **透明化与高性能**：设计目标是让远程调用对开发者透明。为此，Dubbo 采用了动态代理（JDK Proxy 或 Javassist）生成客户端存根。在性能上，默认采用基于 NIO 的 Netty 作为网络框架，自定义的 Dubbo 协议头部精简，序列化支持高效的 Hessian2、Kryo 等，传输层支持单一长连接复用，这些都是为了极致的性能。
-2. **微内核 + 富插件 (SPI)**：Dubbo 采用了高度可扩展的 SPI（Service Provider Interface）机制，这比 Java 标准的 SPI 功能更强大，支持扩展点自动包装（AOP）、自适应扩展（Adaptive）、自动激活扩展（Activate）。核心架构中的 `Protocol`, `Cluster`, `LoadBalance`, `Registry`等都是扩展点。这使得 Dubbo 本身是一个轻量级内核，而所有功能都可以通过插件方式动态替换和扩展。
-3. **分层与模块化**：架构清晰分层，每层职责单一。例如，`Service`和 `Config`层面向 API，`Proxy`层处理代理，`Registry`层负责注册发现，`Cluster`层是路由和容错中心，`Protocol`和 `Exchange`层处理远程调用。模块化设计使得依赖清晰，可以按需引入。
-4. **领域模型驱动**：定义了清晰的核心领域模型，如 `Invoker`（可执行体）、`URL`（统一配置模型）、`Node`（节点）。特别是 `URL`，在 Dubbo 中扮演了配置中心、元数据中心和上下文传递的角色，贯穿整个调用链，是 Dubbo 进行参数传递和组件协作的关键。
-5. **服务治理为中心**：不仅仅是一个 RPC 框架，更是一个服务治理框架。其设计将服务发现、负载均衡、容错、路由、监控等治理能力内建为核心模块，使得大规模分布式系统的管理成为可能。
-###### 6. Dubbo 的分层架构是怎样的？
-Dubbo 采用十层分层架构，自上而下，上层依赖下层。这种设计保证了各层的复用性和清晰的责任边界。
-1. **Service 服务层**：业务逻辑的实际接口和实现。
-2. **Config 配置层**：对外配置接口，管理 `ServiceConfig`、`ReferenceConfig`、`RegistryConfig`等配置对象，对应 Spring 中的 XML 或注解配置。
-3. **Proxy 服务代理层**：无论是 Provider 还是 Consumer，Dubbo 都会生成代理。对于 Consumer，`Proxy`调用 `Invoker`；对于 Provider，`Proxy`是 `Invoker`的具体实现，最终调用业务接口。源码中对应 `ProxyFactory`及其扩展。
-4. **Registry 注册中心层**：封装服务地址的注册与发现。对应 `RegistryFactory`、`Registry`、`RegistryService`等接口。
-5. **Cluster 路由层**：封装多个提供者的路由、负载均衡、集群容错，并桥接注册中心。核心接口是 `Cluster`、`Directory`、`Router`、`LoadBalance`。这一层将多个 `Invoker`伪装成一个 `Invoker`返回给上层。
-6. **Monitor 监控层**：RPC 调用次数和调用时间监控，接口为 `MonitorFactory`、`Monitor`。
-7. **Protocol 远程调用层**：封装 RPC 调用。是 RPC 的核心，对应 `Protocol`、`Invoker`、`Exporter`。`Protocol`负责暴露和引用服务，在暴露时会将 `Invoker`转为 `Exporter`，在引用时会将远程服务转为 `Invoker`。
-8. **Exchange 信息交换层**：封装请求-响应模式，同步转异步。对应 `ExchangeClient`、`ExchangeServer`、`ExchangeChannel`。它是 `Transport`层的上层抽象。
-9. **Transport 网络传输层**：抽象 mina 和 netty 为统一接口，对应 `Channel`、`Client`、`Server`、`Transporter`。
-10. **Serialize 数据序列化层**：负责对象的序列化与反序列化，对应 `Serialization`、`ObjectInput`、`ObjectOutput`。支持多种序列化协议。
-###### 7. Dubbo 的核心功能有哪些？
-- **透明远程调用**：像调用本地服务一样调用远程服务，支持多种协议（Dubbo、HTTP、gRPC 等）。
-- **软负载均衡与容错**：内置多种负载均衡算法（Random, RoundRobin, LeastActive, ConsistentHash）和集群容错策略（Failover, Failfast, Failsafe, Failback, Forking）。
-- **自动服务注册与发现**：基于注册中心，服务自动上线、下线感知。
-- **高度可扩展性**：通过 SPI 机制，几乎所有核心组件都可自定义扩展。
-- **运行期流量调度与治理**：支持条件路由、标签路由、脚本路由等，可实现灰度发布、蓝绿发布。支持动态配置（通过配置中心），可动态调整参数、权重、超时时间等。
-- **服务降级与 mock**：支持服务降级，当非关键服务不可用时进行屏蔽或返回 mock 数据，保证核心链路稳定。
-- **可视化的服务治理**：通过内置的 `dubbo-admin`控制台，可以管理服务、进行流量治理、查看依赖关系。
-- **高性能通信**：基于 Netty 的 NIO 异步通信，默认单一长连接，序列化高效，协议头小，通信性能高。
-###### 8. Dubbo 用到哪些设计模式？
-Dubbo 大量运用了经典设计模式，是其架构优雅和可扩展的关键。
-- **工厂模式（Factory）**：随处可见，如 `ProxyFactory`、`Protocol$Adaptive`（自适应扩展点本身就是工厂）、`ExtensionLoader`是扩展点的工厂。`ExtensionLoader.getExtension(String name)`就是工厂方法。
-- **适配器模式（Adapter）**：大量用于兼容和包装。例如，`ProtocolFilterWrapper`、`ProtocolListenerWrapper`是 `Protocol`的适配器，为 `Protocol`增加过滤器和监听器的功能。`Wrapper`类都是适配器模式的体现。
-- **装饰器模式（Decorator）**：与适配器类似，但更强调功能的增强。在 SPI 加载时，通过包装类（Wrapper）对扩展点进行装饰。例如，`Filter`链就是典型的装饰器模式，每个 `Filter`包装 `Invoker`，在调用前后执行增强逻辑。源码中 `Invoker`的包装链 `ProtocolFilterWrapper.buildInvokerChain()`清晰展示了这一点。
-- **观察者模式（Observer）**：注册中心是典型的观察者模式。服务消费者订阅服务，当服务提供者列表变化时，注册中心通知所有订阅者（消费者）。对应 `RegistryDirectory`的 `notify`方法。
-- **动态代理模式（Proxy）**：核心模式。消费端通过 `ProxyFactory`创建远程服务的代理对象。`JdkProxyFactory`和 `JavassistProxyFactory`是两种实现。
-- **单例模式（Singleton）**：许多核心管理器是单例，如 `ExtensionLoader`为每个扩展接口维护一个单例实例，用于缓存扩展点实现。
-- **模板方法模式（Template Method）**：在抽象类中定义算法骨架。例如 `AbstractClusterInvoker`的 `invoke`方法，定义了选择 `Invoker`、调用、容错的骨架，子类实现具体的容错逻辑（如 `FailoverClusterInvoker`）。
-- **策略模式（Strategy）**：负载均衡（`LoadBalance`）、集群容错（`Cluster`）、序列化（`Serialization`）等都是策略接口，有多种具体实现，运行时根据配置选择。
-- **门面模式（Facade）**：`DubboBootstrap`作为启动类，为用户提供了一个简化的统一入口来配置和启动 Dubbo 应用，封装了内部的复杂初始化过程。
-###### 9. 说说你对 Dubbo 中 Invoker 的理解
-Invoker是 Dubbo 领域模型中最核心的接口，代表了一个可执行的对象。它是 Dubbo 中一个通用的、抽象化的调用模型，统一了本地调用和远程调用。
-定义与地位：Invoker接口的核心方法是 Result invoke(Invocation invocation)。在 Dubbo 中，一切调用行为最终都会收敛到对某个 Invoker的 invoke方法的调用。它位于 Protocol层，是 Protocol暴露和引用的直接产物。
-两大类型：
-本地 Invoker：在服务提供者端，业务接口实现被包装成一个 AbstractProxyInvoker。当消费者请求到来，经过解码和路由后，最终会调用到这个本地 Invoker，它再通过反射调用真正的服务实现。
-远程 Invoker：在服务消费者端，通过 Protocol的 refer方法，将远程服务引用包装成一个 Invoker（通常是 DubboInvoker、HttpInvoker等）。这个 Invoker内部封装了网络通信客户端。当调用其 invoke方法时，它会将调用信息序列化并通过网络发送到服务端。
-在调用链中的角色：在复杂的调用流程中，Invoker会被层层包装，形成一个调用链（Filter Chain）。例如，一个远程 Invoker可能被 MonitorFilter、EchoFilter等包装，最终被 Cluster层的 FailoverClusterInvoker包装。Cluster层返回的 Invoker是一个集群 Invoker，它内部持有一个包含多个远程 Invoker的 Directory，并在 invoke方法中执行负载均衡和容错逻辑。
-与 URL 的关系：每个 Invoker都包含一个 URL对象，这个 URL包含了该 Invoker的所有元数据信息，如协议、主机、端口、路径、参数等。URL是 Invoker的标识和配置来源。
-源码体现：看 DubboInvoker的 doInvoke方法，它会通过 getClients(url)获取或创建到服务端的连接（ExchangeClient），然后调用 request方法发送数据，这清晰地展示了远程 Invoker的本质。而 AbstractProxyInvoker的 doInvoke方法，则是通过 wrapped（被包装的业务实现对象）进行反射调用。
-总结：Invoker是 Dubbo 屏蔽调用细节、实现统一调用模型的关键。它使得上层的 Proxy和 Cluster无需关心下层的调用是本地还是远程、是单一节点还是集群，从而实现了架构的清晰分层和强大灵活性。理解了 Invoker，就理解了 Dubbo 调度的基石。
+Dubbo 是阿里巴巴开源、后来捐献给 Apache 的一个高性能 Java RPC 框架，核心目标是让远程服务调用像调用本地方法一样简单，同时提供完善的服务治理能力。
 
+它具体解决了这几件事：
+- **透明化远程调用**：通过动态代理屏蔽网络通信、序列化/反序列化等复杂细节，开发者只需面向接口编程。
+- **服务注册与发现**：Provider 启动后自动向注册中心注册，Consumer 从注册中心订阅服务地址，动态感知服务上下线。
+- **负载均衡**：在多个 Provider 实例间分配请求，内置随机、轮询、最少活跃等策略，支持自定义。
+- **集群容错**：调用失败时提供 Failover（重试切换）、Failfast（快速失败）、Failsafe（失败安全）等容错机制。
+- **服务监控与治理**：提供调用统计监控，以及路由规则、动态配置、服务降级等治理能力。
+
+从源码角度看，核心抽象是 `Invoker`（统一调用模型）和 `URL`（统一配置模型），所有组件通过 SPI 机制组装，每层都可独立替换。
+
+###### 2. Apache Dubbo 与阿里巴巴 Dubbo 有什么区别？
+本质是同一套代码在不同发展阶段的产物。
+
+- **阿里巴巴 Dubbo**：2011 年开源，2014 年一度停止维护，2017 年重启，包名 `com.alibaba.dubbo`。
+- **Apache Dubbo**：2018 年捐给 Apache 软件基金会，2019 年成为顶级项目，包名改为 `org.apache.dubbo`，两者**不兼容**。
+
+Apache Dubbo 发展更快更开放：积极拥抱云原生（K8s 原生注册、Dubbo Mesh）、引入 Triple 协议（基于 HTTP/2+Protobuf）、支持应用级服务发现，社区也更国际化。
+
+简单记法：捐给 Apache 之前叫阿里版，之后叫 Apache 版，包名是最直观的区分标志。
+
+###### 3. Dubbo 的核心组件有哪些？
+Dubbo 核心组件构成服务治理的基础：
+- **Provider**：服务提供方，暴露服务的容器。
+- **Consumer**：服务消费方，调用远程服务的客户端。
+- **Registry**：注册中心，负责服务地址的注册与订阅，支持 ZooKeeper、Nacos、Consul 等。
+- **Monitor**：监控中心，统计调用次数和耗时，非强制依赖。
+- **Container**：服务运行容器，最常用是 Spring Container。
+
+从代码抽象层面，核心 SPI 接口有：`Protocol`（通信协议）、`Invoker`（调用执行体）、`Exporter`（暴露的服务）、`ProxyFactory`（代理工厂）、`Cluster`（集群容错）、`LoadBalance`（负载均衡）、`Router`（路由规则）、`RegistryFactory`（注册中心工厂）。这些组件通过 SPI 机制灵活扩展和组装。
+
+###### 4. Dubbo 的架构设计是怎样的？
+Dubbo 采用**分层架构 + 微内核 + 富插件**的设计，整体分 10 层，核心流程如下：
+
+**消费者端调用链路**：
+1. `Proxy` 层为接口生成客户端代理，屏蔽远程调用细节。
+2. 调用经过 `Filter` 链做拦截增强（日志、监控、限流等）。
+3. `Cluster` 层从 `Directory` 获取 Invoker 列表 → `Router` 路由过滤 → `LoadBalance` 选出一个 Invoker。
+4. `Protocol` 层将调用封装成请求，通过 Netty 网络传输。
+
+**提供者端处理链路**：
+1. 网络层收到请求，`Protocol` 层解码。
+2. 找到对应 `Exporter` → 本地 `Invoker` → 经过 `Filter` 链。
+3. 调用真实业务实现，结果原路返回。
+
+**注册中心**作为协调者：Provider 注册，Consumer 订阅，变更时主动通知消费者更新本地 `Directory`。
+
+整个设计中 `Invoker` 是核心模型，`URL` 是贯穿全链路的统一配置模型。
+
+###### 5. 说说 Dubbo 的设计思路
+Dubbo 的设计思路可以概括为五个关键点：
+
+1. **透明化与高性能**：动态代理让调用对开发者透明；Netty NIO + 自定义二进制协议（16字节头）+ 单连接多路复用，追求极致性能。
+
+2. **微内核 + 富插件（SPI）**：比 Java 标准 SPI 更强大，支持扩展点自动包装（AOP）、自适应扩展（`@Adaptive`）、条件激活（`@Activate`）。`Protocol`、`Cluster`、`LoadBalance`、`Registry` 等核心组件全部是扩展点，可任意替换。
+
+3. **分层与模块化**：10 层清晰分层，每层职责单一，依赖清晰，可按需引入。
+
+4. **领域模型驱动**：`Invoker`（统一调用体）和 `URL`（统一配置/上下文传递）是两大核心模型，`URL` 贯穿整个调用链，是组件协作的血管。
+
+5. **服务治理为中心**：不只是 RPC 框架，更是服务治理框架。服务发现、负载均衡、容错、路由、监控都是内建核心模块。
+
+###### 6. Dubbo 的分层架构是怎样的？
+Dubbo 自上而下分 10 层，上层依赖下层，下层不感知上层：
+
+| 层次 | 作用 |
+|---|---|
+| **Service** | 业务接口和实现 |
+| **Config** | 配置层，`ServiceConfig`/`ReferenceConfig` 等 |
+| **Proxy** | 代理层，`ProxyFactory`，Consumer 侧生成代理，Provider 侧封装实现 |
+| **Registry** | 注册中心层，`RegistryFactory`/`Registry` |
+| **Cluster** | 路由层，封装多 Provider 的路由/负载均衡/容错，对上层伪装成单个 Invoker |
+| **Monitor** | 监控层，`MonitorFactory`/`Monitor` |
+| **Protocol** | 远程调用层，核心，`Protocol`/`Invoker`/`Exporter` |
+| **Exchange** | 信息交换层，封装请求-响应模式，同步转异步 |
+| **Transport** | 网络传输层，抽象 Netty/Mina 等为统一接口 |
+| **Serialize** | 序列化层，Hessian2/Kryo/Protobuf 等 |
+
+###### 7. Dubbo 的核心功能有哪些？
+- **透明远程调用**：支持 Dubbo/Triple/HTTP/gRPC 等多种协议。
+- **软负载均衡**：内置 Random/RoundRobin/LeastActive/ConsistentHash 四种算法。
+- **集群容错**：Failover/Failfast/Failsafe/Failback/Forking/Broadcast 六种策略。
+- **自动注册与发现**：服务自动上下线感知。
+- **高度可扩展**：SPI 机制，几乎所有核心组件均可替换。
+- **流量调度与治理**：条件路由、标签路由，支持灰度发布、蓝绿部署。
+- **动态配置**：通过配置中心（Nacos/Apollo）动态调整超时、权重、路由规则等，无需重启。
+- **服务降级与 Mock**：非关键服务不可用时返回 Mock 数据，保护核心链路。
+- **可视化治理**：`dubbo-admin` 控制台管理服务、流量、依赖关系。
+- **高性能通信**：Netty NIO 异步通信，单一长连接，序列化高效，协议头紧凑。
+
+###### 8. Dubbo 用到哪些设计模式？
+Dubbo 大量运用了经典设计模式，是其架构优雅和可扩展的关键：
+
+- **工厂模式**：`ProxyFactory`、`RegistryFactory`、`ExtensionLoader` 都是工厂，`ExtensionLoader.getExtension(name)` 就是工厂方法。
+- **代理模式**：核心模式，`JdkProxyFactory` 和 `JavassistProxyFactory` 为 Consumer 创建远程代理。
+- **装饰器模式**：`Filter` 链是典型装饰器，每个 Filter 包装 Invoker，在调用前后执行增强逻辑。`ProtocolFilterWrapper.buildInvokerChain()` 清晰展示了这一点。
+- **适配器模式**：`ProtocolFilterWrapper`、`ProtocolListenerWrapper` 为 `Protocol` 添加过滤器和监听器，是适配器的体现。
+- **观察者模式**：注册中心是典型观察者模式，Provider 变更时注册中心通知所有订阅的 Consumer，`RegistryDirectory.notify()` 是入口。
+- **模板方法模式**：`AbstractClusterInvoker.invoke()` 定义选 Invoker、调用、容错的骨架，子类（如 `FailoverClusterInvoker`）实现具体容错逻辑。
+- **策略模式**：`LoadBalance`、`Cluster`、`Serialization` 都是策略接口，运行时按配置选择具体实现。
+- **单例模式**：`ExtensionLoader` 为每个扩展接口维护单例实例，用于缓存。
+- **门面模式**：`DubboBootstrap` 为用户提供统一简化入口，封装复杂初始化过程。
+
+###### 9. 说说你对 Dubbo 中 Invoker 的理解
+`Invoker` 是 Dubbo 领域模型中最核心的抽象，代表一个**可执行的调用单元**，核心方法是 `Result invoke(Invocation invocation)`。它统一了本地调用和远程调用，是 Dubbo 屏蔽调用细节的基石。
+
+**两大类型**：
+- **本地 Invoker**（Provider 侧）：业务实现被包装成 `AbstractProxyInvoker`，请求到达后通过反射调用真实业务方法。
+- **远程 Invoker**（Consumer 侧）：通过 `Protocol.refer()` 创建，如 `DubboInvoker`，内部封装了网络通信客户端，`invoke()` 时序列化请求并通过网络发送。
+
+**在调用链中的位置**：Invoker 会被层层包装形成调用链。从内到外大致是：`业务Invoker → Filter链 → ClusterInvoker（内含 Directory + LoadBalance）`。Cluster 层返回的是一个集群 Invoker，对上层透明。
+
+**与 URL 的关系**：每个 Invoker 都持有一个 `URL`，包含协议、地址、端口、方法参数等全部元数据，是 Invoker 的身份证。
+
+**源码验证**：`DubboInvoker.doInvoke()` 通过 `getClients(url)` 获取 `ExchangeClient`，调用 `request()` 发送请求，这就是远程 Invoker 的本质。`AbstractProxyInvoker.doInvoke()` 则是通过 `wrapper` 反射调用业务实现。
+
+理解了 Invoker，就理解了 Dubbo 调用模型的骨架。
+
+###### 10. Dubbo 3 带来了哪些重要新特性？
+Dubbo 3 是一次大版本重构，核心变化：
+
+1. **Triple 协议**：基于 HTTP/2 + Protobuf 的新一代协议，完全兼容 gRPC，支持 Unary/Server Streaming/Client Streaming/Bidirectional Streaming 四种调用模式。穿透防火墙能力强，天然跨语言，是 Dubbo 3 的推荐协议。
+
+2. **应用级服务发现**：传统 Dubbo 是接口级服务发现（注册中心存每个接口的 URL），一个应用有 100 个接口就存 100 条记录，注册中心压力大。Dubbo 3 改为**应用级服务发现**：注册中心只存应用实例（IP+端口），详细元数据推送到元数据中心，大幅减轻注册中心压力，在 K8s 场景下也与原生 Service 机制对齐。
+
+3. **Dubbo Mesh（Proxyless）**：支持 Dubbo 服务直接与 Istio 控制面对接，Consumer 侧 SDK 直接与 xDS 协议交互，无需额外部署 Envoy Sidecar，降低性能损耗和运维复杂度。
+
+4. **响应式编程支持**：Triple 协议原生支持 Reactive Streams（基于 RxJava/Reactor），适合流式数据处理场景。
+
+5. **统一的启动 API**：`DubboBootstrap` 提供流式 API，大幅简化 Dubbo 应用的启动配置代码。
+
+###### 11. Dubbo 与 gRPC 有什么区别和联系？
+
+| 对比维度 | Dubbo | gRPC |
+|---|---|---|
+| **定位** | 完整的 RPC + 服务治理框架 | 纯 RPC 通信框架 |
+| **协议** | Dubbo/Triple/HTTP/gRPC 等多协议 | 仅 HTTP/2 + Protobuf |
+| **服务治理** | 内置负载均衡、熔断、路由、注册发现 | 自身不提供，需配合 Envoy/Istio |
+| **语言支持** | Java 为主，多语言能力弱 | 官方支持 10+ 语言 |
+| **接口定义** | Java 接口，无需 IDL | 必须写 `.proto` 文件 |
+| **服务发现** | 依赖注册中心（Nacos/ZK） | 依赖外部（Consul/K8s DNS） |
+| **流式通信** | Triple 协议支持（Dubbo 3） | 原生支持，是设计核心 |
+
+**联系**：Dubbo 3 的 Triple 协议完全兼容 gRPC，Dubbo 服务可直接被 gRPC 客户端调用。如果只是做跨语言 RPC 通信，gRPC 更纯粹；如果需要完整的服务治理体系，Dubbo 更合适；两者在云原生场景下也可通过 Mesh 方案协同工作。
