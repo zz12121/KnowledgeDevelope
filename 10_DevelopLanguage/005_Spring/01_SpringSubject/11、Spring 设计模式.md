@@ -1,218 +1,173 @@
 ###### 1. Spring 中使用了哪些设计模式？
-Spring框架广泛应用了多种设计模式，主要包括：**工厂模式**（BeanFactory、ApplicationContext）、**单例模式**（Bean作用域）、**代理模式**（AOP实现）、**模板方法模式**（JdbcTemplate等）、**观察者模式**（事件驱动模型）、**适配器模式**（HandlerAdapter等）、**装饰器模式**（BeanWrapper等）以及**策略模式**、**责任链模式**等。
-这些模式并非孤立存在，而是相互协作，共同构筑了Spring框架高内聚、低耦合的特性。其核心价值在于：
-- **解耦**：将对象创建、依赖管理与业务逻辑分离
-- **复用**：通过模板化封装通用逻辑
-- **扩展**：提供标准扩展点支持功能增强
-- **管理**：统一管理对象生命周期和交互过程
-###### 2. 工厂模式在 Spring 中的应用？
-工厂模式在Spring中主要体现在**BeanFactory**和**ApplicationContext**这两个核心接口上，它们构成了Spring IoC容器的基础。
-**源码实现分析：**
-```java
-// BeanFactory作为基础工厂接口
-public interface BeanFactory {
-    Object getBean(String name) throws BeansException;
-    <T> T getBean(Class<T> requiredType) throws BeansException;
-    // 其他工厂方法...
-}
 
-// ApplicationContext扩展了工厂功能
-public interface ApplicationContext extends BeanFactory {
-    // 扩展了消息、事件、环境等企业级功能
-}
-```
-**具体应用场景：**
-- **简单工厂模式**：`BeanFactory`根据bean名称或类型返回对应实例，隐藏了具体实现类的创建逻辑
-- **工厂方法模式**：`FactoryBean`接口允许用户自定义复杂对象的创建逻辑
+Spring 框架可以说是设计模式的教科书级实现，几乎把《设计模式》里的主流模式都用了一遍，而且用得都很经典。
+
+主要有这几类：**工厂模式**（`BeanFactory`/`ApplicationContext`，负责对象创建和管理）、**单例模式**（容器级单例，`DefaultSingletonBeanRegistry` 的三级缓存）、**代理模式**（AOP 的底层支撑，JDK 动态代理和 CGLIB）、**模板方法模式**（`JdbcTemplate`/`RestTemplate`/`TransactionTemplate`，封装算法骨架）、**观察者模式**（Spring 事件驱动模型）、**适配器模式**（`HandlerAdapter` 统一处理不同类型的 Controller）、**装饰器模式**（`BeanWrapper`/`TransactionAwareCacheDecorator`，动态增强功能）、**策略模式**（`Resource` 资源加载策略、各种 `Resolver`）、**责任链模式**（拦截器链、Filter 链）。
+
+这些模式并不是孤立存在的，它们相互协作，共同撑起了 Spring 高内聚、低耦合、易扩展的架构风格。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#Spring设计模式概览]]
+
+---
+
+###### 2. 工厂模式在 Spring 中的应用？
+
+工厂模式在 Spring 中最典型的体现是 **`BeanFactory`** 和 **`ApplicationContext`** 这两个核心接口，它们构成了 IoC 容器的基础。
+
+从工厂模式的角度看，Spring 用的是三个层次：
+
+**简单工厂**：`BeanFactory` 根据 bean 名称或类型返回对应实例，把对象创建细节全部隐藏起来，调用方只管 `getBean()`。
+
+**工厂方法**：`FactoryBean` 接口允许用户自定义复杂对象的创建逻辑，比如 `SqlSessionFactoryBean` 创建 MyBatis 的 `SqlSessionFactory`。Spring 容器从 `FactoryBean` 中拿到的是 `getObject()` 返回的对象，而不是 `FactoryBean` 本身：
+
 ```java
 public interface FactoryBean<T> {
-    T getObject() throws Exception;  // 工厂方法
+    T getObject() throws Exception;
     Class<?> getObjectType();
     default boolean isSingleton() { return true; }
 }
 ```
-- **抽象工厂模式**：Spring通过`BeanDefinitionRegistry`和`BeanFactory`体系支持创建相关对象族
-Spring的工厂模式优势在于**集中化管理对象生命周期**，通过配置元数据（XML、注解）控制对象创建，实现了创建逻辑与使用逻辑的彻底分离。
+
+**抽象工厂**：通过 `BeanDefinitionRegistry` 和 `BeanFactory` 的体系，支持创建关联的对象族。
+
+工厂模式的核心价值是**集中化管理对象生命周期**，通过配置元数据（注解、Java Config）控制对象创建，把创建逻辑和使用逻辑彻底分开。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#工厂模式]]
+
+---
+
 ###### 3. 单例模式在 Spring 中的应用？
-Spring通过**注册式单例模式**管理Bean实例，与传统的单例实现不同，Spring的单例是**容器级别的单例**而非ClassLoader级别的单例。
-**源码级实现机制：**
+
+Spring 通过**注册式单例模式**管理 Bean 实例，跟传统的双重检测锁单例不同，Spring 的单例是**容器级别的单例**——同一个容器里 bean 名称对应唯一实例，但不是 ClassLoader 级别的全局唯一。
+
+核心实现在 `DefaultSingletonBeanRegistry` 的三级缓存里：
+
 ```java
-// DefaultSingletonBeanRegistry是单例注册表的核心实现
-public class DefaultSingletonBeanRegistry {
-    // 一级缓存：存储完整的单例Bean
-    private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
-    
-    // 二级缓存：存储早期暴露的Bean（解决循环依赖）
-    private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
-    
-    // 三级缓存：存储ObjectFactory（用于生成代理对象）
-    private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
-    
-    public Object getSingleton(String beanName) {
-        // 依次从一级、二级、三级缓存中查找Bean实例[10](@ref)
-        Object singletonObject = this.singletonObjects.get(beanName);
-        if (singletonObject == null) {
-            // 详细的三级缓存查询逻辑...
-        }
-        return singletonObject;
-    }
-}
+// 一级缓存：完整的单例 Bean
+private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+
+// 二级缓存：早期暴露的 Bean（用于解决循环依赖，存的是半成品）
+private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
+
+// 三级缓存：ObjectFactory（用于生成代理对象，支持 AOP 增强）
+private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
 ```
-**设计特点：**
-- **双重检测锁机制**：在`getSingleton`方法中通过synchronized块确保线程安全
-- **三级缓存解决循环依赖**：通过分层缓存策略解决Setter注入的循环依赖问题
-- **灵活的单例控制**：虽然默认单例，但可通过`@Scope("prototype")`设置为原型模式
-这种设计既保证了性能，又解决了传统单例模式难以处理的循环依赖等复杂场景。
+
+获取 Bean 时，依次从一级、二级、三级缓存查找，层层降级。如果三级缓存里有 `ObjectFactory`，调用它的 `getObject()` 生成对象（可能是 AOP 代理），然后提升到二级缓存。
+
+三级缓存解决循环依赖的关键就在这里：A 在创建过程中把自己的 `ObjectFactory` 放到三级缓存，B 注入 A 时能从三级缓存拿到 A 的早期引用，避免了死循环。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#单例模式]]
+
+---
+
 ###### 4. 代理模式在 Spring 中的应用？
-代理模式是Spring **AOP（面向切面编程）的底层支撑**，Spring通过动态代理技术在运行时增强目标对象的功能。
-**两种代理实现机制：**
-**JDK动态代理**（基于接口）：
-```java
-// JdkDynamicAopProxy是实现JDK动态代理的核心类
-final class JdkDynamicAopProxy implements AopProxy, InvocationHandler {
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        // 拦截方法调用，执行增强逻辑
-        MethodInvocation invocation = new ReflectiveMethodInvocation(
-            proxy, target, method, args, targetClass, chain);
-        return invocation.proceed();
-    }
-}
-```
-**CGLIB动态代理**（基于子类继承）：
-- 当目标类没有实现接口时，Spring使用CGLIB生成子类代理
-- 通过`MethodInterceptor`接口拦截方法调用并植入增强逻辑
-**代理创建流程**（在`AbstractAutoProxyCreator`中）：
-1. 判断是否应该为Bean创建代理
-2. 收集匹配的Advisor（增强器）
-3. 根据目标类特点选择JDK代理或CGLIB代理
-4. 创建并返回代理对象
-代理模式使得Spring能够**无侵入性地实现横切关注点**，如事务管理（`@Transactional`）、安全控制、日志记录等。
+
+代理模式是 Spring **AOP 的底层支撑**，Spring 通过动态代理在运行时增强目标对象的功能，不需要修改目标类的源码。
+
+Spring 使用两种代理实现，自动选择：
+
+**JDK 动态代理**：目标类实现了接口时使用，`JdkDynamicAopProxy` 实现 `InvocationHandler` 接口，通过反射调用目标方法，前后织入增强逻辑。创建快，但方法调用稍慢（反射开销）。
+
+**CGLIB 代理**：目标类没有实现接口时使用，通过字节码技术生成目标类的子类，覆盖父类方法来实现拦截。创建慢，但方法调用快（直接方法调用）。
+
+代理创建流程在 `AbstractAutoProxyCreator` 中：判断是否需要创建代理 → 收集匹配的 `Advisor`（增强器）→ 根据目标类选择 JDK 代理还是 CGLIB → 创建并返回代理对象。
+
+代理模式的实际应用非常广泛：`@Transactional` 事务管理、`@Cacheable` 缓存、`@Async` 异步、`@Secured` 安全控制——这些注解背后全是代理在干活。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#代理模式]]
+
+---
+
 ###### 5. 模板方法模式在 Spring 中的应用？
-模板方法模式在Spring中广泛应用于**简化重复性操作**，定义算法骨架的同时允许子类重定义特定步骤。
-**JdbcTemplate的模板模式实现：**
+
+模板方法模式的核心思想是：**在父类中定义算法骨架，把可变的步骤留给子类或回调来实现**。Spring 大量使用这个模式来消除重复代码。
+
+`JdbcTemplate` 是最经典的例子。操作数据库的流程是固定的（获取连接 → 创建 Statement → 执行 → 处理结果 → 释放资源），但具体 SQL 和结果处理逻辑是可变的。`JdbcTemplate` 把固定流程封装在模板方法里，可变部分通过回调接口（`StatementCallback`/`RowMapper` 等）让调用方填入：
+
 ```java
-public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
-    public <T> T execute(StatementCallback<T> action) throws DataAccessException {
-        // 定义算法骨架：获取连接、创建语句、执行回调、释放资源
-        Connection con = DataSourceUtils.getConnection(obtainDataSource());
-        Statement stmt = null;
-        try {
-            stmt = con.createStatement();
-            applyStatementSettings(stmt);
-            T result = action.doInStatement(stmt);  // 调用回调方法（可变部分）
-            handleWarnings(stmt);
-            return result;
-        } catch (SQLException ex) {
-            // 异常处理（固定部分）
-            JdbcUtils.closeStatement(stmt);
-            DataSourceUtils.releaseConnection(con, getDataSource());
-            throw translateException("StatementCallback", getSql(action), ex);
-        }
+// 固定的算法骨架
+public <T> T execute(StatementCallback<T> action) {
+    Connection con = DataSourceUtils.getConnection(obtainDataSource());
+    Statement stmt = null;
+    try {
+        stmt = con.createStatement();
+        T result = action.doInStatement(stmt);  // 可变部分：回调
+        return result;
+    } catch (SQLException ex) {
+        throw translateException(...);
+    } finally {
+        JdbcUtils.closeStatement(stmt);
+        DataSourceUtils.releaseConnection(con, getDataSource());
     }
 }
 ```
-**其他模板类应用：**
-- `RestTemplate`：封装RESTful HTTP请求处理流程
-- `TransactionTemplate`：提供声明式事务管理的模板
-- `JmsTemplate`：简化JMS消息操作
-模板方法模式的优势在于**去除重复代码**、**确保算法步骤一致性**、**提供标准扩展点**。
+
+其他模板类同理：`RestTemplate` 封装 HTTP 请求流程、`TransactionTemplate` 封装事务管理流程、`JmsTemplate` 封装 JMS 消息操作。模板方法模式的价值在于：**保证了算法步骤的一致性**，同时提供了灵活的扩展点，让调用方只关注业务逻辑。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#模板方法模式]]
+
+---
+
 ###### 6. 观察者模式在 Spring 中的应用？
-Spring通过**事件驱动模型**实现观察者模式，实现ApplicationContext中Bean之间的松耦合通信。
-**核心组件构成：**
-- **事件源**：`ApplicationEventPublisher`（事件发布者）
-- **观察者**：`ApplicationListener`（事件监听器）
-- **事件对象**：`ApplicationEvent`（事件载体）
-**源码实现细节：**
-```java
-// ApplicationEventMulticaster是事件广播的核心接口
-public interface ApplicationEventMulticaster {
-    void addApplicationListener(ApplicationListener<?> listener);
-    void multicastEvent(ApplicationEvent event);
-}
 
-// SimpleApplicationEventMulticaster实现同步事件广播
-public class SimpleApplicationEventMulticaster implements ApplicationEventMulticaster {
-    public void multicastEvent(final ApplicationEvent event) {
-        for (final ApplicationListener<?> listener : getApplicationListeners(event)) {
-            // 遍历所有监听器并通知事件
-            invokeListener(listener, event);
-        }
+Spring 通过**事件驱动模型**实现观察者模式，四个核心角色：事件（`ApplicationEvent`）、发布者（`ApplicationEventPublisher`）、监听器（`ApplicationListener`/`@EventListener`）、广播器（`ApplicationEventMulticaster`）。
+
+当发布者调用 `publishEvent()` 时，广播器 `SimpleApplicationEventMulticaster` 遍历所有匹配的监听器并调用它们的处理方法：
+
+```java
+public void multicastEvent(final ApplicationEvent event) {
+    for (final ApplicationListener<?> listener : getApplicationListeners(event)) {
+        invokeListener(listener, event);  // 同步或异步，取决于是否配置了 TaskExecutor
     }
 }
 ```
-**使用示例：**
-```java
-// 自定义事件
-public class OrderCreatedEvent extends ApplicationEvent {
-    public OrderCreatedEvent(Order source) { super(source); }
-}
 
-// 事件监听器
-@Component
-public class OrderEventListener implements ApplicationListener<OrderCreatedEvent> {
-    @Override
-    public void onApplicationEvent(OrderCreatedEvent event) {
-        // 处理订单创建事件
-        System.out.println("处理订单: " + event.getSource());
-    }
-}
+实际应用场景：订单创建后通知库存系统、用户注册后发送欢迎邮件、文件上传后触发处理任务——这些跨模块的通知场景，用事件机制比直接调用优雅得多，发布方和监听方完全解耦。
 
-// 事件发布
-@Service
-public class OrderService {
-    @Autowired
-    private ApplicationEventPublisher publisher;
-    
-    public void createOrder(Order order) {
-        // 业务逻辑...
-        publisher.publishEvent(new OrderCreatedEvent(order));
-    }
-}
-```
-观察者模式使得Spring组件能够**解耦通信**，特别适合实现系统模块间的异步通知机制。
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#观察者模式]]
+
+---
+
 ###### 7. 适配器模式在 Spring 中的应用？
-适配器模式在Spring中主要用于**接口转换**，使不兼容的接口能够协同工作。
-**Spring MVC中的HandlerAdapter：**
+
+适配器模式解决的是**接口不兼容**的问题，让原本不能协作的类能够一起工作。Spring 里最典型的是 **`HandlerAdapter`**。
+
+Spring MVC 支持多种类型的 Controller（实现 `Controller` 接口的、标注 `@RequestMapping` 的、实现 `HttpRequestHandler` 的），每种 Controller 的调用方式都不一样。`HandlerAdapter` 对每种类型的 Controller 提供适配器，统一暴露 `handle()` 接口，`DispatcherServlet` 只跟 `HandlerAdapter` 打交道，不需要关心底层 Controller 的类型：
+
 ```java
 public interface HandlerAdapter {
     boolean supports(Object handler);
     ModelAndView handle(HttpServletRequest request, 
                        HttpServletResponse response, Object handler) throws Exception;
 }
+```
 
-// 多种适配器实现不同Controller类型
-public class SimpleControllerHandlerAdapter implements HandlerAdapter {
-    public boolean supports(Object handler) {
-        return (handler instanceof Controller);
-    }
-    
-    public ModelAndView handle(HttpServletRequest request, 
-                              HttpServletResponse response, Object handler) throws Exception {
-        return ((Controller) handler).handleRequest(request, response);
-    }
-}
-```
-**AOP中的适配器应用：**
-Spring AOP通过`AdvisorAdapter`将各种Advice（通知）适配成统一的`MethodInterceptor`接口：
-- `MethodBeforeAdviceAdapter`：将`MethodBeforeAdvice`适配成`MethodInterceptor`
-- `AfterReturningAdviceAdapter`：将`AfterReturningAdvice`适配成`MethodInterceptor`
-适配器模式的引入使得Spring能够**灵活支持多种实现策略**，保持框架的扩展性和兼容性。
+AOP 里也有适配器：`AdvisorAdapter` 将各种 `Advice`（`MethodBeforeAdvice`/`AfterReturningAdvice`）适配为统一的 `MethodInterceptor` 接口，让拦截器链能统一处理所有通知类型。
+
+适配器模式让 Spring 能够**灵活支持多种实现策略**，新增一种 Controller 类型只需新增对应的适配器，不需要改核心逻辑。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#适配器模式]]
+
+---
+
 ###### 8. 装饰器模式在 Spring 中的应用？
-装饰器模式在Spring中用于**动态增强对象功能**，通过包装原有对象添加额外职责。
-**BeanWrapper的实现：**
-`BeanWrapper`是Spring中典型的装饰器应用，它包装了Bean实例，提供更强的属性访问和能力：
+
+装饰器模式通过**包装原有对象来动态添加功能**，不修改原类，不影响调用方代码。Spring 里的典型应用是 `BeanWrapper`。
+
+`BeanWrapper` 包装了 Bean 实例，在原始对象的基础上提供了更强的属性访问能力：支持属性路径（如 `address.city`）、自动类型转换、嵌套属性设置：
+
 ```java
-public class BeanWrapperImpl extends AbstractNestablePropertyAccessor implements BeanWrapper {
-    private Object wrappedObject;  // 被包装的原始对象
-    
-    // 增强的属性访问方法
-    public void setPropertyValue(String propertyName, Object value) {
-        // 实现复杂的属性设置逻辑（类型转换、嵌套属性等）
-    }
-}
+BeanWrapperImpl wrapper = new BeanWrapperImpl(user);
+wrapper.setPropertyValue("address.city", "北京");  // 嵌套属性
+wrapper.setPropertyValue("age", "25");  // 字符串自动转 int
 ```
-**其他装饰器应用：**
-- `HttpServletRequestWrapper`：增强HttpServletRequest功能
-- `TransactionAwareCacheDecorator`：为缓存添加事务支持
-- 各种以`Wrapper`或`Decorator`结尾的类
-装饰器模式与代理模式的区别在于：装饰器**关注于功能的增强**，而代理模式更注重**访问控制**。Spring通过装饰器模式能够透明地增强对象功能，而不影响客户端代码。
+
+其他装饰器应用：
+- `HttpServletRequestWrapper`：增强 `HttpServletRequest`，常用于参数加解密、日志记录
+- `TransactionAwareCacheDecorator`：为缓存实例添加事务感知能力
+- `DelegatingApplicationContext`：代理另一个 `ApplicationContext`
+
+装饰器和代理模式看起来很像，区别在于：**装饰器关注功能增强**，被装饰者和装饰者通常实现同一接口，可以层层包装；**代理模式关注访问控制**，代理和真实对象实现同一接口，但代理控制对真实对象的访问，通常只有一层。
+
+📖 [[../../../../24_SpringKnowledge/08_高级特性与性能/01、Spring设计模式应用#装饰器模式]]

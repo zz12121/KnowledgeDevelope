@@ -1,110 +1,146 @@
 ###### 1. 什么是事务？事务的 ACID 特性是什么？
-**事务**是数据库操作的最小工作单元，包含一个或多个SQL语句，这些语句要么全部成功执行，要么全部失败回滚。最经典的例子是银行转账：A账户减100元和B账户加100元两个操作必须作为一个不可分割的整体。
-**ACID特性**是事务的四个核心属性：
 
-|特性|核心含义|实现机制|
-|---|---|---|
-|**原子性（Atomicity）**​|事务中的所有操作要么全部提交成功，要么全部失败回滚|通过Undo Log实现。在事务执行过程中，数据库会记录数据修改前的镜像，事务回滚时用Undo Log恢复原始数据|
-|**一致性（Consistency）**​|事务执行前后，数据库必须从一种一致性状态变换到另一种一致性状态|由应用层和数据库共同保证。应用层要编写正确的事务逻辑，数据库通过原子性、隔离性和持久性来保证一致性|
-|**隔离性（Isolation）**​|并发事务之间相互隔离，一个事务的执行不应影响其他事务|通过锁机制、多版本并发控制（MVCC）等技术实现。不同隔离级别采用不同的隔离策略|
-|**持久性（Durability）**​|事务提交后，其对数据的修改是永久性的，即使系统故障也不会丢失|通过Redo Log实现。事务提交前，先将数据变更写入Redo Log，即使系统崩溃也能通过Redo Log恢复数据|
+事务是数据库操作的最小工作单元，里面的一组操作要么全部成功提交，要么全部失败回滚，绝对不允许只执行一半。银行转账是最经典的例子：A 扣钱和 B 加钱必须绑在一起，不能出现 A 扣了钱、B 却没收到的情况。
+
+**ACID 四个特性：**
+
+**原子性（Atomicity）**：事务里的操作是一个不可分割的整体，要么全成功，要么全回滚。底层通过 **Undo Log** 实现，事务执行时记录修改前的数据镜像，回滚时用 Undo Log 恢复。
+
+**一致性（Consistency）**：事务执行前后，数据库必须从一种合法状态变换到另一种合法状态，不能出现数据矛盾（比如总金额不能变）。一致性是目标，原子性/隔离性/持久性是手段。
+
+**隔离性（Isolation）**：并发事务之间相互隔离，一个事务的中间状态对其他事务不可见。通过锁机制和 MVCC（多版本并发控制）实现，不同隔离级别对应不同的隔离策略。
+
+**持久性（Durability）**：事务一旦提交，数据修改就是永久的，即使系统崩溃也不会丢。底层通过 **Redo Log** 实现，事务提交前先把变更写入 Redo Log，崩溃恢复时通过 Redo Log 重放数据。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#一、ACID 特性回顾]]
+
+---
+
 ###### 2. Spring 如何管理事务？
-Spring通过**事务管理器**（`PlatformTransactionManager`）统一管理事务，提供了**声明式事务**和**编程式事务**两种管理方式。
-**核心架构组件**：
-- **PlatformTransactionManager**：事务管理器的核心接口
-- **TransactionDefinition**：定义事务的属性（隔离级别、传播行为、超时时间、只读性）
-- **TransactionStatus**：描述事务的状态（是否新事务、是否有回滚标记等）
-**Spring事务管理流程**：
-1. **事务拦截**：通过AOP（声明式）或模板方法（编程式）拦截目标方法
-2. **事务创建**：根据`TransactionDefinition`创建或加入现有事务
-3. **业务执行**：在事务上下文中执行目标方法
-4. **事务处理**：根据执行结果提交或回滚事务
-**源码机制**：Spring通过`TransactionInterceptor`实现声明式事务管理。当调用`@Transactional`方法时，拦截器会调用`TransactionAspectSupport#invokeWithinTransaction()`方法，该方法内部通过`PlatformTransactionManager`管理事务的完整生命周期。
+
+Spring 通过 **`PlatformTransactionManager`** 统一管理事务，提供了两种管理方式：声明式事务和编程式事务。
+
+**核心架构三件套：**
+
+- **`PlatformTransactionManager`**：事务管理器核心接口，定义 `getTransaction()`、`commit()`、`rollback()` 三个操作。常用实现有 `DataSourceTransactionManager`（JDBC/MyBatis）和 `JpaTransactionManager`（JPA/Hibernate）
+- **`TransactionDefinition`**：定义事务属性，包括传播行为、隔离级别、超时时间、是否只读
+- **`TransactionStatus`**：描述当前事务状态，是否是新事务、是否已标记回滚等
+
+**声明式事务的执行路径：** 调用 `@Transactional` 方法 → 进入 AOP 代理 → `TransactionInterceptor` 拦截 → 调用 `TransactionAspectSupport.invokeWithinTransaction()` → 获取事务管理器 → 开启/加入事务 → 执行业务方法 → 提交或回滚。
+
+**线程绑定机制**：Spring 通过 `TransactionSynchronizationManager` 用 **ThreadLocal** 把数据库连接绑定到当前线程，保证同一线程的多个 DAO 操作使用同一个数据库连接，这是事务原子性的物理基础。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#二、Spring 事务管理架构]]
+
+---
+
 ###### 3. 编程式事务和声明式事务的区别是什么？
 
-|特性|编程式事务|声明式事务|
-|---|---|---|
-|**控制方式**​|代码中显式控制事务边界|通过注解或XML配置声明事务属性|
-|**侵入性**​|侵入性强，业务代码与事务代码耦合|非侵入性，事务管理与业务逻辑分离|
-|**易用性**​|复杂度高，需要编写模板代码|简单易用，只需添加注解|
-|**灵活性**​|灵活性高，可精确控制事务边界|灵活性相对较低，边界由AOP规则确定|
-|**适用场景**​|复杂事务逻辑，需要精细控制|大多数常规业务场景|
-**编程式事务实现示例**：
+**编程式事务**：代码里显式控制事务边界，通过 `TransactionTemplate` 或 `PlatformTransactionManager` 手写开启、提交、回滚逻辑：
+
 ```java
-public class AccountService{
+@Service
+public class AccountService {
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
-    public void transfer(final String out, final String in, final Double money) {
-        transactionTemplate.execute(new TransactionCallbackWithoutResult(){
-            @Override
-            protected void doInTransactionWithoutResult(TransactionStatus status){
-                accountDao.outMoney(out,money); // 转出
-                accountDao.inMoney(in,money);  // 转入
-            }
+    public void transfer(String out, String in, Double money) {
+        transactionTemplate.execute(status -> {
+            accountDao.outMoney(out, money);
+            accountDao.inMoney(in, money);
+            return null;
         });
     }
 }
 ```
-**声明式事务实现示例**：
+
+**声明式事务**：用注解声明，Spring 通过 AOP 自动处理，业务代码不沾事务代码：
+
 ```java
 @Service
-public class AccountService2 {
+public class AccountService {
     @Autowired
     private AccountDao accountDao;
 
     @Transactional
     public void transfer(String out, String in, Double money) {
-        accountDao.outMoney(out, money); // 转出
-        accountDao.inMoney(in, money);   // 转入
+        accountDao.outMoney(out, money);
+        accountDao.inMoney(in, money);
     }
 }
 ```
+
+**如何选择：** 绝大多数场景用声明式，简单干净。只有需要在方法内部动态控制事务边界（比如循环处理时部分提交）才用编程式。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#三、声明式 vs 编程式事务]]
+
+---
+
 ###### 4. @Transactional 注解的使用方法和注意事项是什么？
-**使用方法**：
-- **类级别**：类中所有public方法都启用事务管理
-- **方法级别**：仅对标注的方法启用事务管理（优先级高于类级别）
-**完整参数配置**：
+
+`@Transactional` 可以加在**类**（类里所有 public 方法都开启事务）或**方法**（只对当前方法）上，方法级别优先级更高。
+
+**完整参数：**
+
 ```java
 @Transactional(
-    value = "transactionManager",       // 指定事务管理器
-    propagation = Propagation.REQUIRED, // 传播行为
-    isolation = Isolation.DEFAULT,      // 隔离级别
-    timeout = 30,                       // 超时时间（秒）
-    readOnly = false,                   // 是否只读
-    rollbackFor = {Exception.class},    // 触发回滚的异常
-    noRollbackFor = {BusinessException.class} // 不触发回滚的异常
+    value = "transactionManager",            // 指定事务管理器（多数据源时需要）
+    propagation = Propagation.REQUIRED,      // 传播行为，默认 REQUIRED
+    isolation = Isolation.DEFAULT,           // 隔离级别，默认用数据库的
+    timeout = 30,                            // 超时时间（秒），超时自动回滚
+    readOnly = false,                        // 只读事务，可以优化查询性能
+    rollbackFor = {Exception.class},         // 指定哪些异常触发回滚
+    noRollbackFor = {BusinessException.class} // 指定哪些异常不触发回滚
 )
 ```
-**重要注意事项**：
-1. **代理机制限制**：基于动态代理，只有**public方法**上的注解才有效，且**自调用**（同一类中方法A调用方法B）不会触发事务
-2. **异常回滚规则**：默认只在抛出**RuntimeException**和**Error**时回滚，受检异常不会回滚。可通过`rollbackFor`自定义
-3. **事务管理器选择**：多数据源时需要明确指定事务管理器bean名称
-4. **超时设置**：避免长时间持有数据库连接，根据业务复杂度设置合理超时
-###### 5. Spring 事务的传播行为有哪些？
-传播行为定义了**多个事务方法相互调用时，事务如何传播**的策略。Spring定义了7种传播行为：
 
-|传播行为|值|说明|适用场景|
-|---|---|---|---|
-|**PROPAGATION_REQUIRED**​|0|默认。当前有事务则加入，无则新建|大多数业务场景|
-|**PROPAGATION_SUPPORTS**​|1|当前有事务则加入，无则以非事务运行|查询方法，可适应事务环境|
-|**PROPAGATION_MANDATORY**​|2|当前有事务则加入，无则抛异常|必须在外层事务中调用的方法|
-|**PROPAGATION_REQUIRES_NEW**​|3|挂起当前事务，创建新事务|独立事务操作（如日志记录）|
-|**PROPAGATION_NOT_SUPPORTED**​|4|以非事务运行，挂起当前事务|不支持事务的存储操作|
-|**PROPAGATION_NEVER**​|5|以非事务运行，有事务则抛异常|不能在事务中调用的方法|
-|**PROPAGATION_NESTED**​|6|当前有事务则在嵌套事务中执行，无则新建|复杂业务中的部分回滚场景|
-**嵌套事务示例**：
+**四大注意事项：**
+
+1. **只对 public 方法有效**：AOP 代理只能拦截 public 方法，protected/private 方法上加了也没用
+
+2. **自调用不生效**：同一个类里方法 A 调用方法 B，调用不经过代理，B 上的 `@Transactional` 无效
+
+3. **默认只对 RuntimeException 回滚**：受检异常（`IOException`、`SQLException` 等）默认不回滚，生产代码建议加 `rollbackFor = Exception.class`
+
+4. **异常不能被吞掉**：如果 catch 了异常但没有重新抛出，事务拦截器感知不到异常，不会触发回滚
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#四、@Transactional 参数详解]]
+
+---
+
+###### 5. Spring 事务的传播行为有哪些？
+
+传播行为定义了"事务方法被另一个事务方法调用时，事务如何传播"。Spring 定义了 7 种：
+
+**REQUIRED（默认）**：有事务就加入，没有就新建。最常用，覆盖 90% 的场景。
+
+**REQUIRES_NEW**：不管外层有没有事务，都挂起外层事务，新建一个独立事务。用于需要独立提交的操作，比如日志记录、审计，即使主业务回滚，日志也要保存。
+
+**NESTED**：如果当前有事务，在嵌套事务（保存点）里执行；没有就新建。回滚时只回滚到保存点，不影响外层事务。比 REQUIRES_NEW 更轻量，外层能感知嵌套事务的回滚。
+
+**SUPPORTS**：有事务就加入，没有就以非事务方式运行。适合只读查询方法。
+
+**MANDATORY**：有事务就加入，没有就抛异常。适合必须在事务内调用的方法。
+
+**NOT_SUPPORTED**：以非事务方式运行，有事务就挂起它。
+
+**NEVER**：非事务运行，有事务就抛异常。
+
+**REQUIRES_NEW vs NESTED 的关键区别：**
+
+- `REQUIRES_NEW` 创建完全独立的新事务，外层回滚不影响新事务
+- `NESTED` 在外层事务的保存点里执行，外层回滚会把嵌套事务一起回滚
+
 ```java
 @Service
 public class OrderService {
     @Transactional(propagation = Propagation.REQUIRED)
     public void placeOrder(Order order) {
-        // 主业务逻辑
         orderDao.save(order);
         try {
-            // 记录日志需要独立事务，即使订单失败日志也要保存
-            logService.auditLog("Order created: " + order.getId());
+            logService.auditLog("订单创建: " + order.getId()); // 独立事务
         } catch (Exception e) {
-            // 日志失败不应影响主业务
+            // 日志失败不影响主业务
         }
     }
 }
@@ -113,193 +149,164 @@ public class OrderService {
 public class LogService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void auditLog(String message) {
-        // 独立事务记录日志
+        logDao.save(new AuditLog(message)); // 独立提交，主业务回滚也会保存
     }
 }
 ```
-###### 6. Spring 事务的隔离级别有哪些？
-隔离级别解决了并发事务可能导致的问题，Spring支持5种隔离级别：
 
-|隔离级别|值|脏读|不可重复读|幻读|性能影响|
-|---|---|---|---|---|---|
-|**ISOLATION_DEFAULT**​|-1|取决于数据库默认|同左|同左|平衡|
-|**ISOLATION_READ_UNCOMMITTED**​|1|可能|可能|可能|最低|
-|**ISOLATION_READ_COMMITTED**​|2|阻止|可能|可能|较低|
-|**ISOLATION_REPEATABLE_READ**​|4|阻止|阻止|可能|中等|
-|**ISOLATION_SERIALIZABLE**​|8|阻止|阻止|阻止|最高|
-**并发问题说明**：
-- **脏读**：读取到其他事务未提交的数据
-- **不可重复读**：同一事务内多次读取同一数据结果不一致（被其他事务修改）
-- **幻读**：同一事务内多次查询返回的记录数不同（被其他事务插入/删除）
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#五、7 种传播行为]]
+
+---
+
+###### 6. Spring 事务的隔离级别有哪些？
+
+隔离级别解决并发事务带来的三种问题：脏读、不可重复读、幻读。级别越高，并发性能越低。
+
+**脏读**：读到其他事务未提交的数据，对方回滚后你读的数据就是"脏"的
+
+**不可重复读**：同一事务内两次读同一行数据，结果不一样（被其他事务修改了）
+
+**幻读**：同一事务内两次查询，返回的行数不一样（被其他事务插入/删除了行）
+
+**Spring 支持 5 种隔离级别：**
+
+- **DEFAULT**：使用数据库默认的，MySQL InnoDB 默认是 REPEATABLE_READ
+- **READ_UNCOMMITTED**：最低级别，三种问题都可能发生，几乎不用
+- **READ_COMMITTED**：阻止脏读，Oracle/SQL Server 的默认级别
+- **REPEATABLE_READ**：阻止脏读和不可重复读，MySQL InnoDB 的默认级别（MVCC 也基本解决了幻读）
+- **SERIALIZABLE**：最高级别，三种问题全防，但串行执行，性能最差
+
+实际项目大多数场景用数据库默认值（DEFAULT）就够了，特殊需求再单独配置。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#六、5 种隔离级别]]
+
+---
+
 ###### 7. 什么情况下 @Transactional 会失效？
-**常见失效场景及解决方案**：
-1. **自调用问题**（最常见）
-```java
-    @Service
-    public class UserService {
-        public void updateUser(User user) {
-            saveAuditLog(user); // 自调用，@Transactional失效！
-        }
-    
-        @Transactional
-        public void saveAuditLog(User user) {
-            // 不会在事务中执行
-        }
-    }
-```
-**解决方案**：注入自身代理或提取方法到其他类
-2. **方法可见性非public**
-```java
-    @Service
-    public class UserService {
-        @Transactional
-        protected void internalOperation() { // 失效！
-        }
-    }
-```
-3. **异常被捕获未抛出**
-```java
-    @Service
-    public class OrderService {
-        @Transactional
-        public void placeOrder() {
-            try {
-                // 业务逻辑
-            } catch (Exception e) {
-                log.error("Error occurred", e); // 异常被吃掉，事务不会回滚
-            }
-        }
-    }
-```
-4. **数据库引擎不支持事务**（如MyISAM）
-5. **多数据源未指定事务管理器**
-###### 8. 如何实现分布式事务？
-分布式事务涉及多个独立资源（数据库、消息队列等）的事务一致性，常用方案：
-**强一致性方案**：
-- **XA协议/JTA**：基于两阶段提交（2PC），需要支持XA的资源和事务管理器
-**最终一致性方案**：
-- **TCC模式**（Try-Confirm-Cancel）
-```java
-    public class TccOrderService {
-        @Transactional
-        public void tryPhase() {
-            // 预留资源：冻结金额、预扣库存
-            accountService.freezeAmount(amount);
-            inventoryService.prepareDecrease(productId, quantity);
-        }
-    
-        public void confirmPhase() {
-            // 确认操作：实际扣款、扣减库存
-            accountService.confirmFreeze(amount);
-            inventoryService.confirmDecrease(productId, quantity);
-        }
-    
-        public void cancelPhase() {
-            // 取消操作：解冻金额、恢复库存
-            accountService.cancelFreeze(amount);
-            inventoryService.cancelDecrease(productId, quantity);
-        }
-    }
-```
-- **消息队列+本地事件表**
-```java
-    @Transactional
-    public void placeOrder(Order order) {
-        // 1. 订单数据+事件记录在同一个数据库事务中
-        orderDao.save(order);
-        eventDao.saveEvent(new OrderCreatedEvent(order.getId()));
-        // 2. 定时任务发送事件消息（确保最终一致）
-    }
-```
-###### 9. 什么是事务的回滚规则？
-回滚规则定义了**在什么情况下事务应该回滚**的策略配置。
-**默认回滚规则**：
-- 回滚：`RuntimeException`及其子类、`Error`及其子类
-- 不回滚：受检异常（Exception子类但不是RuntimeException）
-**自定义回滚规则**：
+
+`@Transactional` 失效是面试高频题，也是生产环境常见的坑：
+
+**1. 自调用（最常见）**：同类里的方法 A 调方法 B，绕过了代理，B 上的注解不生效：
+
 ```java
 @Service
-public class BusinessService {
-    // 遇到BusinessException时回滚
-    @Transactional(rollbackFor = BusinessException.class)
-    public void operation1() throws BusinessException {
+public class UserService {
+    public void updateUser(User user) {
+        saveAuditLog(user); // 不走代理！@Transactional 无效
     }
-    
-    // 遇到IOException时不回滚
-    @Transactional(noRollbackFor = IOException.class)
-    public void operation2() throws IOException {
-    }
-    
-    // 所有异常都回滚
-    @Transactional(rollbackFor = Exception.class)
-    public void criticalOperation() throws Exception {
+
+    @Transactional
+    public void saveAuditLog(User user) { ... }
+}
+```
+
+解决方式：把 `saveAuditLog` 提到独立的 Bean 里，或者通过 `AopContext.currentProxy()` 拿到代理对象来调用。
+
+**2. 方法非 public**：protected/private 方法上加了也不生效，AOP 代理无法拦截。
+
+**3. 异常被吞掉**：catch 了异常但没有重新 throw，拦截器感知不到异常，不会触发回滚：
+
+```java
+@Transactional
+public void placeOrder() {
+    try {
+        // 业务逻辑
+    } catch (Exception e) {
+        log.error("出错了", e); // 异常被吞掉，不会回滚！
     }
 }
 ```
-###### 10. Spring事务实现的源码原理
-Spring事务的实现原理是一个融合了**AOP（面向切面编程）**、**代理模式**​ 和**平台抽象**​ 的复杂机制，其核心目标是将事务管理这一横磨关注点与业务逻辑代码解耦。下面我们从核心架构、关键流程和源码细节三个层面进行剖析。
-🔧 核心架构与组件
-Spring事务的底层实现依赖于几个关键组件，它们协同工作，将声明式注解（如`@Transactional`)转化为具体的事务操作。
 
-|组件|核心职责|关键实现类/接口|
-|---|---|---|
-|**事务管理器**​ (`PlatformTransactionManager`)|统一事务管理的核心接口，定义了事务的**获取、提交、回滚**行为。|`DataSourceTransactionManager`(JDBC), `HibernateTransactionManager`(Hibernate)|
-|**事务属性源**​ (`TransactionAttributeSource`)|负责解析事务方法（如`@Transactional`）上的**元数据**，包括传播行为、隔离级别等。|`AnnotationTransactionAttributeSource`|
-|**事务拦截器**​ (`TransactionInterceptor`)|一个AOP **MethodInterceptor**，是事务执行的**核心入口**，将事务属性转化为具体的事务操作。|`TransactionInterceptor`|
-|**事务切面**​ (`BeanFactoryTransactionAttributeSourceAdvisor`)|一个AOP **Advisor**，它将**切入点**（匹配带有`@Transactional`的方法）和**通知**（`TransactionInterceptor`）组合成一个完整的切面。|`BeanFactoryTransactionAttribute|
-|SourceAdvisor`|
-|**自动代理创建器**​|在Bean生命周期中，负责扫描Bean，并为那些|
-**需要事务增强的Bean创建代理对象**。 | `InfrastructureAdvisorAutoProxyCreator`|
-这些组件的协作关系，可以用以下时序图来直观展示其核心工作流程：
-```mermaid
-flowchart TD
-    A[@Transactional 方法被调用] --> B(调用 代理对象)
-    B --> C{事务拦截器拦截调用}
-    D[TransactionInterceptor] --> E
-    E[PlatformTransactionManager] --> F
-    F[DataSourceTransaction]
-    C --> D
-    subgraph 事务处理核心流程
-        E
-        F
-    end
+**4. 异常类型不匹配**：默认只对 `RuntimeException` 和 `Error` 回滚，`IOException` 这类受检异常不会触发回滚。要加 `rollbackFor = Exception.class`。
+
+**5. 数据库引擎不支持事务**：MySQL 的 MyISAM 引擎不支持事务，只有 InnoDB 支持。
+
+**6. 多数据源未指定事务管理器**：多数据源场景下，没有指定 `value = "xxTransactionManager"`，可能用错了事务管理器。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#八、事务失效的 7 种场景]]
+
+---
+
+###### 8. 如何实现分布式事务？
+
+分布式事务涉及多个服务/数据库的数据一致性，比单机事务复杂得多。常见方案：
+
+**XA/2PC（强一致性）**：基于两阶段提交协议，Prepare 阶段所有参与者预提交，Commit 阶段统一提交。强一致，但性能差（锁持有时间长），协调者单点故障风险大。Seata 的 AT 模式就是基于类似思想但做了优化。
+
+**TCC（Try-Confirm-Cancel）**：把每个操作拆成三步：Try（预留资源）、Confirm（确认提交）、Cancel（回滚释放）。代码侵入性强，但性能好，适合核心交易场景：
+
+```java
+// Try 阶段：冻结金额（不是真正扣款）
+accountService.freezeAmount(userId, amount);
+// Confirm 阶段：确认扣款
+accountService.confirmFreeze(userId, amount);
+// Cancel 阶段：解冻（失败时回滚）
+accountService.cancelFreeze(userId, amount);
 ```
-🚀 关键流程与源码解析
-整个事务处理流程可以清晰地分为两个主要阶段：**代理创建**和**事务执行**。
- 1. 代理创建与织入
-在Spring容器启动时，通过自动代理机制完成事务增强：
-- **自动代理创建器**​ (`InfrastructureAdvisorAutoProxyCreator`) 作为一个`BeanPostProcessor`，在Bean的**初始化后**阶段，会检查当前Bean是否**匹配**
-**事务切面**（即`BeanFactoryTransactionAttributeSourceAdvisor`）。
-- 如果匹配，则会为该Bean创建一个**代理对象**（**JDK动态代理**或**CGLIB代理**），并将`TransactionInterceptor`植入代理逻辑中。这使得后续对该Bean方法的调用会先经过`TransactionInterceptor`。
- 2. 事务执行流程
-当调用代理对象的方法时，核心逻辑进入`TransactionInterceptor`，它又委托给其父类`TransactionAspectSupport`的`invokeWithinTransaction`方法。此方法是事务执行的**大脑**，其核心步骤如下：
-- **Step 1: 获取事务属性**
-    通过`TransactionAttributeSource`解析当前被调用方法上的`@Transactional`注解，获取传播行为、隔离级别等属性，并封装为`TransactionAttribute`。
-- **Step 2: 获取事务管理器**
-    根据`TransactionAttribute`中的限定符或其它规则，确定使用哪个`PlatformTransactionManager`，这对于多数据源场景至关重要。
-- **Step 3: 创建或加入事务（核心）**
-    这是最复杂的一步，由`PlatformTransactionManager.getTransaction(TransactionDefinition)`方法实现，其内部处理逻辑如下：
-	**1. 检查****当前线程是否存在活跃事务
-	**2. 根据****传播行为****决定后续动作
-	**3. 执行事务创建或挂**
-	**4. 将资源绑定到当前线程**
-- **Step 4: 执行业务逻辑**
-    在已建立的事务上下文中，通过`MethodInvocation.proceed()`调用链，最终执行用户的业务代码。
-- **Step 5: 提交或回滚**
-    - 如果业务逻辑执行成功且未抛出异常，则调用`commit()`提交事务。
-    - 如果抛**异常**，**则根据回滚规则**（默认对`RuntimeException`和`Error`回滚）决定是否调用`rollback()`。开发者可以通过`@Transactional(rollbackFor = Exception.class)`来定制回滚规则。
-💡 核心机制深度解析
- 传播行为的实现
-传播行为决定了事务方法在调用时如何与现有事务交互。其核心实现机制如下：[citation1]
-- **PROPAGATION_REQUIRED (默认)**: 如果当前存在事务，则加入该事务，否则创建一个新事务。
-- **PROPRichATION_REQUIRES_NEW**: 无论当前是否存在事务，都创建一个新事务。如果**当前有事务**则将其挂起**，新事务独立提交或回滚，与挂起的事务无关。这是通过`TransactionSuspension`机制实现的。
-- **PROPAGATION_NESTED**: 如果当前存在事务，则在**嵌套事务**中执行。它会在当前事务内设置一个**保存点**， 回滚时只回滚到该保存点，而不会影响整个外部事务。需要数据库支持保存点。
-资源同步与线程绑定
-Spring通过`TransactionSynchronizationManager`类，使用**ThreadLocal**将数据库连接（`ConnectionHolder`）等资源**绑定到当前线程**，确保在同一线程的多个事务操作（如多个DAO方法调用）中，使用的是同一个连接，**从而保证事务的原子性**。
-⚠️ 常见失效场景与原理
-理解源码后，可以轻松解释常见的`@Transactional`失效场景：
-- **自调用**：在同一个类中非事务方法调用`@Transactional`方法，**会绕过代理对象**，直接调用目标方法，导致事务拦截器不生效。
-- **方法非public**：`@Transactional`默认只对public方法生效，因为Spring的AOP代理机制无法代理非public方法。
-- **异常被捕获**：事务回滚依赖于异常**被抛出**到拦截器，如果在方法内部被捕获并处理，拦截器将无法感知异常，**从而不会触发回滚**。
- 📚 总结
-Spring事务的源码实现是一个精妙的设计，它通过AOP和代理模式将**复杂的事务管理逻辑**封装**在`TransactionInterceptor`和`PlatformTransactionManager`中，**使得开发者可以通过简单的注解**享受强大而灵活的事务管理能力。 理解其底层原理，**不仅有助于避免常见的坑**，更能让我们在遇到复杂问题时能快速定位和解决。
+
+**消息队列 + 本地事务（最终一致性）**：把业务操作和消息发送绑在同一个本地事务里，通过消息中间件（如 RocketMQ 的事务消息）保证消息一定能发出去，下游消费后达成最终一致：
+
+```java
+@Transactional
+public void placeOrder(Order order) {
+    orderDao.save(order);
+    eventDao.save(new OrderCreatedEvent(order.getId())); // 同一事务
+    // 定时任务扫描未发送的事件，确保消息最终发出
+}
+```
+
+**Seata**：阿里开源的分布式事务框架，支持 AT（自动补偿）、TCC、Saga 等多种模式，AT 模式对业务侵入最小，是目前实际项目用得最多的。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#九、分布式事务方案]]
+
+---
+
+###### 9. 什么是事务的回滚规则？
+
+回滚规则控制"遇到什么异常触发回滚，遇到什么不回滚"。
+
+**默认规则**：
+- 触发回滚：`RuntimeException` 及其子类、`Error` 及其子类
+- 不触发回滚：受检异常（`Exception` 的子类，但不是 `RuntimeException`），比如 `IOException`、`SQLException`
+
+**自定义规则：**
+
+```java
+// 任何 Exception 都回滚（生产代码推荐）
+@Transactional(rollbackFor = Exception.class)
+public void criticalOperation() throws Exception { ... }
+
+// 自定义业务异常触发回滚
+@Transactional(rollbackFor = BusinessException.class)
+public void operation() throws BusinessException { ... }
+
+// IO 异常不触发回滚（比如只是日志写入失败，不影响主业务）
+@Transactional(noRollbackFor = IOException.class)
+public void loggingOperation() throws IOException { ... }
+```
+
+实际项目建议统一加 `rollbackFor = Exception.class`，避免因受检异常没有回滚导致数据不一致的问题。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#四、@Transactional 参数详解]]
+
+---
+
+###### 10. Spring 事务的源码原理是什么？
+
+Spring 事务的核心是 **AOP + PlatformTransactionManager + ThreadLocal** 三者的协作。
+
+**代理创建阶段**：`InfrastructureAdvisorAutoProxyCreator`（一个 `BeanPostProcessor`）在 Bean 初始化后检查该 Bean 是否有 `@Transactional` 注解，有就创建代理对象，把 `TransactionInterceptor` 织入进去。
+
+**方法调用阶段**：
+
+1. 调用 `@Transactional` 方法 → 进入代理
+2. `TransactionInterceptor.invoke()` 拦截 → 委托给 `TransactionAspectSupport.invokeWithinTransaction()`
+3. `AnnotationTransactionAttributeSource` 解析方法上的 `@Transactional` 注解，获取事务属性
+4. 根据属性找到对应的 `PlatformTransactionManager`
+5. `getTransaction()` 开启事务（REQUIRED 时：有活跃事务就加入，没有就新建；并把数据库连接绑定到 ThreadLocal）
+6. 执行业务方法
+7. 正常返回 → `commit()`；抛异常 → 检查回滚规则 → `rollback()`
+
+**ThreadLocal 的关键作用**：`TransactionSynchronizationManager` 把 `ConnectionHolder`（包含数据库连接）绑定到当前线程的 ThreadLocal。同一线程里的所有 DAO 操作从 ThreadLocal 拿到同一个连接，保证在同一个事务里。这也是为什么事务不能跨线程：子线程有自己的 ThreadLocal，拿不到父线程的事务上下文。
+
+📖 [[../../../24_SpringKnowledge/03_事务管理/01、Spring事务管理#十、事务源码原理]]

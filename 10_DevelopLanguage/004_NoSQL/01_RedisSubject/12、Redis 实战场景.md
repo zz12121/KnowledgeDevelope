@@ -1,8 +1,10 @@
 ###### 1. 如何使用 Redis 实现限流?
-Redis限流通过控制单位时间内的请求量来保护系统，主要采用四种算法实现：
-**固定窗口计数器（计数器算法）**
-- **原理**：使用`INCR`命令统计固定时间窗口内的请求数，超过阈值则限流
-- **Java实现**：
+Redis 限流通过控制单位时间内的请求量来保护系统，主要有四种算法实现：
+
+**固定窗口计数器**
+
+用 `INCR` 统计固定时间窗口内的请求数，超过阈值则拒绝。实现最简单，但有个经典的窗口临界点问题——在两个窗口的边界时刻可能瞬间通过 2 倍阈值的请求。
+
 ```java
 public boolean isAllowed(String key, int limit, int window) {
     String luaScript = 
@@ -23,10 +25,11 @@ public boolean isAllowed(String key, int limit, int window) {
     return "1".equals(result.toString());
 }
 ```
-- **缺点**：存在窗口临界点问题，可能瞬间通过2倍阈值请求
+
 **滑动窗口日志**
-- **原理**：使用有序集合存储请求时间戳，移除窗口外数据后统计数量
-- **实现**：
+
+用有序集合存储请求时间戳，每次请求先移除窗口外的旧数据，再统计窗口内请求数。解决了临界点问题，但每个请求都要存一条记录，内存消耗较大。
+
 ```java
 public boolean slidingWindow(String key, int limit, int windowSec) {
     long now = System.currentTimeMillis();
@@ -49,13 +52,17 @@ public boolean slidingWindow(String key, int limit, int windowSec) {
         String.valueOf(windowSec + 1)) != null;
 }
 ```
+
 **令牌桶算法**
-- **原理**：以恒定速率向桶中添加令牌，请求获取令牌后才被处理
-- **优势**：允许突发流量，适合需要应对流量波动的场景
-**漏桶算法**​
-- **原理**：以固定速率处理请求，超出速率的请求被丢弃或排队
-- **特点**：严格限制处理速率，保证流量平滑
-生产环境推荐使用**Redisson**的`RRateLimiter`，它基于滑动窗口实现，支持分布式环境：
+
+以恒定速率向桶中添加令牌，请求消耗令牌。允许突发流量（桶满时积累了令牌），适合需要应对流量波动的场景。
+
+**漏桶算法**
+
+以固定速率处理请求，超出容量的请求被丢弃或排队，流量绝对平滑，但不允许突发。
+
+生产环境推荐直接使用 **Redisson 的 `RRateLimiter`**，分布式友好，基于滑动窗口：
+
 ```java
 RRateLimiter limiter = redisson.getRateLimiter("myLimiter");
 limiter.trySetRate(RateType.OVERALL, 100, 1, RateIntervalUnit.MINUTES);
@@ -63,14 +70,23 @@ if (limiter.tryAcquire(1)) {
     // 请求通过
 }
 ```
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#1-限流|知识库：Redis 限流实现]]
+
+---
+
 ###### 2. 如何使用 Redis 实现排行榜?
-Redis的**有序集合(ZSET)是实现排行榜的理想选择，支持自动排序和高效范围查询
-核心命令与应用**：
+Redis 的**有序集合（ZSet）**是实现排行榜的理想选择，自动按 score 排序，支持高效的范围查询。
+
+**核心命令**
+
 - `ZADD key score member`：添加或更新成员分数
-- `ZREVRANGE key start stop WITHSCORES`：获取排名前N的成员
-- `ZREVRANK key member`：获取成员排名（从高到低）
-- `ZINCRBY key increment member`：增加成员分数
-**Java完整实现**：
+- `ZREVRANGE key start stop WITHSCORES`：按分数从高到低获取前 N 名
+- `ZREVRANK key member`：获取成员排名（从 0 开始，0 = 第 1 名）
+- `ZINCRBY key increment member`：为成员加分
+
+**Java 完整实现**
+
 ```java
 public class LeaderboardService {
     private Jedis jedis;
@@ -81,17 +97,17 @@ public class LeaderboardService {
         jedis.zadd(LEADERBOARD_KEY, score, userId);
     }
     
-    // 获取前N名排行榜
+    // 获取前 N 名排行榜
     public List<Player> getTopN(int n) {
         Set<Tuple> results = jedis.zrevrangeWithScores(LEADERBOARD_KEY, 0, n-1);
         return results.stream().map(tuple -> 
             new Player(tuple.getElement(), tuple.getScore())).collect(Collectors.toList());
     }
     
-    // 获取用户排名
+    // 获取用户排名（1-based）
     public Long getUserRank(String userId) {
         Long rank = jedis.zrevrank(LEADERBOARD_KEY, userId);
-        return rank != null ? rank + 1 : null; // 转换为1-based排名
+        return rank != null ? rank + 1 : null;
     }
     
     // 分页查询
@@ -104,44 +120,46 @@ public class LeaderboardService {
     }
 }
 ```
-**高级特性**：
-- **多维度排行榜**：使用不同key区分（如日榜、周榜、总榜）
-- **分数相同处理**：默认按成员字典序排序，可通过`ZREVRANGEBYSCORE`精细控制
-- **过期策略**：为临时排行榜设置TTL，自动清理过期数据
+
+**高级特性**：多维度排行榜用不同 key 区分（如日榜 `leaderboard:daily:20260315`、总榜 `leaderboard:total`）；临时排行榜设置 TTL 自动过期；分数相同时 ZSet 默认按 member 字典序排序，可以设计组合 score（分数左移 + 时间戳）实现相同分数按时间先后排序。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#2-排行榜|知识库：Redis 排行榜实现]]
+
+---
+
 ###### 3. 如何使用 Redis 实现签到功能?
-签到功能需要记录每日签到状态并统计连续签到天数，**位图(Bitmap)是最佳选择
-位图签到实现**：
+签到功能需要记录每日状态并统计连续天数，**Bitmap（位图）**是最佳选择——每个用户每月仅需约 4 字节的存储空间。
+
 ```java
 public class SignInService {
     private static final String SIGN_KEY_PREFIX = "sign:";
     
-    // 用户签到
+    // 用户签到：以日期在月份中的天数减 1 作为 offset
     public boolean signIn(String userId, LocalDate date) {
         String key = getKey(userId, date.getYear(), date.getMonthValue());
-        int offset = date.getDayOfMonth() - 1; // 日期作为偏移量
-        
+        int offset = date.getDayOfMonth() - 1;
         return jedis.setbit(key, offset, true);
     }
     
-    // 统计当月签到天数
+    // 统计当月签到天数（BITCOUNT 一次搞定）
     public long getSignCount(String userId, int year, int month) {
         String key = getKey(userId, year, month);
         return jedis.bitcount(key);
     }
     
-    // 检查连续签到天数（改进版）
+    // 计算连续签到天数（从今天向前遍历）
     public int getContinuousDays(String userId) {
         LocalDate today = LocalDate.now();
         int continuous = 0;
         
-        for (int i = 0; i < 30; i++) { // 检查最近30天
+        for (int i = 0; i < 30; i++) {
             LocalDate date = today.minusDays(i);
             String key = getKey(userId, date.getYear(), date.getMonthValue());
             int offset = date.getDayOfMonth() - 1;
             
             if (jedis.getbit(key, offset)) {
                 continuous++;
-            } else if (i > 0) { // 今天没签到不算断签
+            } else if (i > 0) {  // 今天未签到不算断签，从昨天开始断才算
                 break;
             }
         }
@@ -153,37 +171,38 @@ public class SignInService {
     }
 }
 ```
-**位图优势**：
-- **极致存储效率**：每个用户每月仅需约4KB存储空间
-- **快速统计**：`BITCOUNT`命令O(1)复杂度统计签到天数
-- **内存优化**：稀疏位图自动压缩，节省内存
+
+**位图优势**：极致存储效率，1 亿用户一天的签到数据只需约 12MB；`BITCOUNT` 统计签到天数是 O(N)（N 是字节数），月签到约 4 字节，接近 O(1)；多用户签到数据可以用 `BITOP AND` 求交集（同时签到的用户）、`BITOP OR` 求并集。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#3-签到统计|知识库：Redis 签到功能实现]]
+
+---
+
 ###### 4. 如何使用 Redis 实现点赞功能?
-点赞功能需要处理点赞状态、计数和防重复，采用**哈希(Hash)和**集合(Set)**组合方案
+点赞功能要处理三件事：状态记录、计数、防重复。采用 **Hash + Set 组合方案**：Hash 存储点赞计数，Set 记录用户是否已点赞（防重）。
+
 ```java
 public class LikeService {
     private static final String LIKE_KEY_PREFIX = "like:";
     private static final String USER_LIKED_PREFIX = "user_liked:";
     
-    // 点赞/取消点赞
+    // 点赞 / 取消点赞（幂等操作）
     public boolean toggleLike(String userId, String targetType, String targetId) {
         String likeKey = LIKE_KEY_PREFIX + targetType + ":" + targetId;
         String userLikedKey = USER_LIKED_PREFIX + userId;
         String field = targetType + ":" + targetId;
         
-        // 使用事务保证原子性
         Transaction tx = jedis.multi();
-        
         if (jedis.sismember(userLikedKey, field)) {
-            // 取消点赞
+            // 已点赞 → 取消
             tx.hincrBy(likeKey, "count", -1);
             tx.srem(userLikedKey, field);
         } else {
-            // 点赞
+            // 未点赞 → 点赞
             tx.hincrBy(likeKey, "count", 1);
             tx.sadd(userLikedKey, field);
-            tx.hset(likeKey, "last_liked", System.currentTimeMillis());
+            tx.hset(likeKey, "last_liked", String.valueOf(System.currentTimeMillis()));
         }
-        
         tx.exec();
         return true;
     }
@@ -195,56 +214,51 @@ public class LikeService {
         return count != null ? Long.parseLong(count) : 0;
     }
     
-    // 用户是否已点赞
+    // 检查用户是否已点赞
     public boolean hasLiked(String userId, String targetType, String targetId) {
         String userLikedKey = USER_LIKED_PREFIX + userId;
-        String field = targetType + ":" + targetId;
-        return jedis.sismember(userLikedKey, field);
+        return jedis.sismember(userLikedKey, targetType + ":" + targetId);
     }
 }
 ```
-**数据结构设计要点**：
-- **哈希存储计数**：`like:post:123`→ `{count: 45, last_liked: 1640995200}`
-- **集合记录用户行为**：`user_liked:user456`→ `["post:123", "comment:789"]`
-- **过期策略**：为热点数据设置TTL，冷数据持久化到数据库
+
+**数据结构设计**：`like:post:123` → Hash，存 `{count: 45, last_liked: 时间戳}`；`user_liked:user456` → Set，存该用户点过赞的所有内容 ID（`["post:123", "comment:789"]`）。热点内容的点赞数据定期同步到数据库，冷数据可以设置 TTL 淘汰。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#4-点赞系统|知识库：Redis 点赞功能实现]]
+
+---
+
 ###### 5. 如何使用 Redis 实现共同好友?
-共同好友基于**集合运算**，Redis提供高效的`SINTER`、`SUNION`、`SDIFF`命令
+共同好友基于**集合运算**，Redis 的 `SINTER`（交集）命令天然支持这个场景。
+
 ```java
 public class FriendService {
     private static final String FRIEND_KEY_PREFIX = "friends:";
     
-    // 添加好友关系
+    // 添加好友关系（双向）
     public void addFriend(String userId, String friendId) {
-        String userKey = FRIEND_KEY_PREFIX + userId;
-        String friendKey = FRIEND_KEY_PREFIX + friendId;
-        
         Transaction tx = jedis.multi();
-        tx.sadd(userKey, friendId);
-        tx.sadd(friendKey, userId); // 双向关系
+        tx.sadd(FRIEND_KEY_PREFIX + userId, friendId);
+        tx.sadd(FRIEND_KEY_PREFIX + friendId, userId);
         tx.exec();
     }
     
     // 获取共同好友
     public Set<String> getCommonFriends(String userId1, String userId2) {
-        String key1 = FRIEND_KEY_PREFIX + userId1;
-        String key2 = FRIEND_KEY_PREFIX + userId2;
-        
-        return jedis.sinter(key1, key2);
+        return jedis.sinter(FRIEND_KEY_PREFIX + userId1, FRIEND_KEY_PREFIX + userId2);
     }
     
-    // 推荐好友（好友的好友）
+    // 好友推荐（好友的好友）
     public Set<String> getFriendRecommendations(String userId, int maxResults) {
         String userKey = FRIEND_KEY_PREFIX + userId;
         Set<String> friends = jedis.smembers(userKey);
         
-        // 获取所有好友的好友集合
         Pipeline pipeline = jedis.pipelined();
         for (String friend : friends) {
             pipeline.smembers(FRIEND_KEY_PREFIX + friend);
         }
         List<Object> results = pipeline.syncAndReturnAll();
         
-        // 合并并排除已有好友
         Set<String> recommendations = new HashSet<>();
         for (Object result : results) {
             @SuppressWarnings("unchecked")
@@ -252,19 +266,23 @@ public class FriendService {
             recommendations.addAll(friendFriends);
         }
         
-        recommendations.removeAll(friends);
-        recommendations.remove(userId); // 排除自己
+        recommendations.removeAll(friends);  // 排除已有好友
+        recommendations.remove(userId);      // 排除自己
         
         return recommendations.stream().limit(maxResults).collect(Collectors.toSet());
     }
 }
 ```
-**性能优化**：
-- **管道批量操作**：减少网络往返次数
-- **集合运算优化**：避免大集合运算，可分批处理
-- **缓存策略**：对结果进行短期缓存
+
+**性能优化**：获取好友的好友列表时用 Pipeline 批量获取，减少网络往返；大集合运算避免在主线程直接 `SINTER`，可以用 `SINTERSTORE` 存入临时 key 后异步处理；好友推荐结果可以短期缓存，避免重复计算。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#5-共同好友|知识库：Redis 共同好友实现]]
+
+---
+
 ###### 6. 如何使用 Redis 实现附近的人?
-Redis的**GEO地理位置**功能基于有序集合实现，支持半径查询和距离计算
+Redis 的 **GEO 地理位置**功能基于有序集合和 Geohash 算法，支持半径查询和距离计算，天然适合"附近的人"场景。
+
 ```java
 public class NearbyService {
     private static final String LOCATION_KEY = "user:locations";
@@ -274,101 +292,96 @@ public class NearbyService {
         jedis.geoadd(LOCATION_KEY, longitude, latitude, userId);
     }
     
-    // 查找附近的人（半径范围内）
-    public List<GeoRadiusResponse> findNearbyUsers(double longitude, double latitude, 
+    // 查找附近的人（指定经纬度和半径）
+    public List<GeoRadiusResponse> findNearbyUsers(double longitude, double latitude,
                                                    double radius, GeoUnit unit) {
         return jedis.georadius(LOCATION_KEY, longitude, latitude, radius, unit, 
             GeoRadiusParam.geoRadiusParam().withDist().withCoord().sortAscending());
     }
     
-    // 获取两人距离
+    // 获取两人之间的距离
     public Double getDistance(String userId1, String userId2, GeoUnit unit) {
         return jedis.geodist(LOCATION_KEY, userId1, userId2, unit);
     }
     
     // 分页查询附近的人
-    public List<GeoRadiusResponse> findNearbyUsersPaged(double longitude, double latitude, 
+    public List<GeoRadiusResponse> findNearbyUsersPaged(double longitude, double latitude,
                                                        double radius, GeoUnit unit,
                                                        int page, int size) {
         int offset = (page - 1) * size;
         return jedis.georadius(LOCATION_KEY, longitude, latitude, radius, unit,
             GeoRadiusParam.geoRadiusParam()
-                .withDist()
-                .withCoord()
-                .sortAscending()
-                .limit(offset + size)
+                .withDist().withCoord().sortAscending().limit(offset + size)
         ).subList(offset, offset + size);
     }
 }
 ```
-**GEO底层原理**：
-- **Geohash编码**：将二维坐标转换为一维字符串，保留空间关系
-- **有序集合存储**：Geohash作为score，实现快速范围查询
-- **精度控制**：根据业务需求选择合适的Geohash精度级别
+
+**GEO 底层原理**：Geohash 把二维经纬度转换为一维整数，空间相近的点 Geohash 值相近，因此用 Sorted Set 按 Geohash 值排序后，范围查询就变成了一维区间查询，效率很高。注意 Redis 7.0+ 推荐使用 `GEOSEARCH` 命令（支持圆形和矩形两种范围），`GEORADIUS` 已被标记为废弃。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#6-附近的人|知识库：Redis 附近的人实现]]
+
+---
+
 ###### 7. 如何使用 Redis 实现购物车?
-购物车需要支持商品增删改查和过期清理，**哈希(Hash)**结构最合适
+购物车需要支持商品增删改查，结构是"用户 → 多个商品 → 各自数量"，**Hash 结构**最合适：key 是 `cart:userId`，field 是商品 ID，value 是数量。
+
 ```java
 public class ShoppingCartService {
     private static final String CART_KEY_PREFIX = "cart:";
     private static final int CART_EXPIRE_DAYS = 30;
     
-    // 添加商品到购物车
+    // 添加/更新商品数量
     public void addItem(String userId, String productId, int quantity) {
         String cartKey = CART_KEY_PREFIX + userId;
-        
         if (quantity <= 0) {
-            // 数量为0或负数时移除商品
-            jedis.hdel(cartKey, productId);
+            jedis.hdel(cartKey, productId);  // 数量为 0 直接移除
         } else {
             jedis.hset(cartKey, productId, String.valueOf(quantity));
         }
-        
-        // 刷新过期时间
-        jedis.expire(cartKey, CART_EXPIRE_DAYS * 24 * 60 * 60);
+        jedis.expire(cartKey, CART_EXPIRE_DAYS * 86400);  // 刷新过期时间
     }
     
-    // 获取购物车商品数量
+    // 获取购物车商品总数量
     public int getCartItemCount(String userId) {
-        String cartKey = CART_KEY_PREFIX + userId;
-        Map<String, String> cart = jedis.hgetAll(cartKey);
-        return cart.values().stream().mapToInt(Integer::parseInt).sum();
+        return jedis.hgetAll(CART_KEY_PREFIX + userId)
+            .values().stream().mapToInt(Integer::parseInt).sum();
     }
     
     // 获取购物车所有商品
     public Map<String, Integer> getCartItems(String userId) {
-        String cartKey = CART_KEY_PREFIX + userId;
-        Map<String, String> cart = jedis.hgetAll(cartKey);
-        
-        return cart.entrySet().stream()
+        return jedis.hgetAll(CART_KEY_PREFIX + userId).entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, 
                 e -> Integer.parseInt(e.getValue())));
     }
     
     // 清空购物车
     public void clearCart(String userId) {
-        String cartKey = CART_KEY_PREFIX + userId;
-        jedis.del(cartKey);
+        jedis.del(CART_KEY_PREFIX + userId);
     }
     
-    // 合并购物车（用户登录时合并临时购物车）
+    // 合并购物车（用户登录时将临时购物车合并到账号购物车）
     public void mergeCarts(String userId, Map<String, Integer> tempCart) {
         String cartKey = CART_KEY_PREFIX + userId;
-        
         Pipeline pipeline = jedis.pipelined();
         for (Map.Entry<String, Integer> entry : tempCart.entrySet()) {
             pipeline.hincrBy(cartKey, entry.getKey(), entry.getValue());
         }
-        pipeline.expire(cartKey, CART_EXPIRE_DAYS * 24 * 60 * 60);
+        pipeline.expire(cartKey, CART_EXPIRE_DAYS * 86400);
         pipeline.sync();
     }
 }
 ```
-**购物车设计考虑**：
-- **数据持久化**：定期将购物车数据同步到数据库
-- **库存校验**：下单前验证商品库存是否充足
-- **价格同步**：商品价格变化时需重新计算
+
+**设计注意点**：购物车是高频读写数据，适合全量存 Redis；下单时再查数据库校验库存和最新价格，不要把价格存购物车里（价格可能变）；合并购物车时用 `HINCRBY` 累加数量而不是简单覆盖。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#7-购物车|知识库：Redis 购物车实现]]
+
+---
+
 ###### 8. 如何使用 Redis 实现秒杀系统?
-秒杀系统核心是**库存原子操作**和**防超卖**，利用Redis的原子性命令
+秒杀的核心问题是**防超卖**和**高并发**，需要把"检查库存 + 扣减库存 + 记录用户"这三步做成原子操作，Lua 脚本是标准答案。
+
 ```java
 public class SecKillService {
     private static final String STOCK_KEY_PREFIX = "seckill:stock:";
@@ -376,19 +389,17 @@ public class SecKillService {
     
     // 初始化秒杀库存
     public void initStock(String productId, int stock) {
-        String stockKey = STOCK_KEY_PREFIX + productId;
-        jedis.set(stockKey, String.valueOf(stock));
+        jedis.set(STOCK_KEY_PREFIX + productId, String.valueOf(stock));
     }
     
-    // 秒杀核心逻辑（Lua脚本保证原子性）
+    // 秒杀核心逻辑（Lua 脚本保证原子性）
     public boolean secKill(String userId, String productId) {
         String luaScript = 
             "local stockKey = KEYS[1]\n" +
             "local userKey = KEYS[2]\n" +
             "local userId = ARGV[1]\n" +
-            "local productId = ARGV[2]\n" +
             "\n" +
-            "-- 检查用户是否已参与\n" +
+            "-- 防重：检查用户是否已参与\n" +
             "if redis.call('SISMEMBER', userKey, userId) == 1 then\n" +
             "    return 0\n" +
             "end\n" +
@@ -399,7 +410,7 @@ public class SecKillService {
             "    return 0\n" +
             "end\n" +
             "\n" +
-            "-- 扣减库存并记录用户\n" +
+            "-- 原子扣减库存 + 记录用户\n" +
             "redis.call('DECR', stockKey)\n" +
             "redis.call('SADD', userKey, userId)\n" +
             "return 1";
@@ -407,32 +418,32 @@ public class SecKillService {
         Object result = jedis.eval(luaScript, 2, 
             STOCK_KEY_PREFIX + productId, 
             USER_KEY_PREFIX + productId,
-            userId, productId);
-        
+            userId);
         return "1".equals(result.toString());
     }
     
-    // 获取剩余库存
     public int getRemainingStock(String productId) {
-        String stockKey = STOCK_KEY_PREFIX + productId;
-        String stock = jedis.get(stockKey);
+        String stock = jedis.get(STOCK_KEY_PREFIX + productId);
         return stock != null ? Integer.parseInt(stock) : 0;
     }
 }
 ```
-**秒杀优化策略**：
-- **库存预热**：活动开始前将库存加载到Redis
-- **限流降级**：结合限流算法保护系统
-- **异步处理**：秒杀成功后异步处理订单逻辑
-- **缓存预热**：提前加载商品信息到缓存
+
+**秒杀优化策略**：活动开始前提前**库存预热**，将库存数据加载到 Redis；入口处加**限流**（如令牌桶），拦截大量无效请求；秒杀成功后**异步处理**订单（发消息队列），避免同步调用数据库导致 Redis 等待；还可以用消息队列做**流量削峰**，把秒杀请求排队处理。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#8-秒杀系统|知识库：Redis 秒杀系统实现]]
+
+---
+
 ###### 9. 如何使用 Redis 实现分布式 Session?
-分布式Session解决多实例间的状态共享问题，Redis提供高性能存储方案
+分布式 Session 解决多实例间的用户状态共享问题，Redis 用 Hash 结构存储 Session 数据，UUID 作为 Session ID。
+
 ```java
 public class RedisSessionManager {
     private static final String SESSION_KEY_PREFIX = "session:";
-    private static final int SESSION_TIMEOUT = 30 * 60; // 30分钟
+    private static final int SESSION_TIMEOUT = 30 * 60;  // 30 分钟
     
-    // 创建Session
+    // 创建 Session
     public String createSession(User user) {
         String sessionId = UUID.randomUUID().toString();
         String sessionKey = SESSION_KEY_PREFIX + sessionId;
@@ -441,85 +452,76 @@ public class RedisSessionManager {
         sessionData.put("userId", user.getId());
         sessionData.put("username", user.getUsername());
         sessionData.put("loginTime", String.valueOf(System.currentTimeMillis()));
-        sessionData.put("lastAccessTime", String.valueOf(System.currentTimeMillis()));
         
         jedis.hset(sessionKey, sessionData);
         jedis.expire(sessionKey, SESSION_TIMEOUT);
-        
         return sessionId;
     }
     
-    // 获取Session
+    // 获取 Session（同时刷新过期时间）
     public Session getSession(String sessionId) {
         String sessionKey = SESSION_KEY_PREFIX + sessionId;
-        
-        // 刷新过期时间
         if (!jedis.exists(sessionKey)) {
             return null;
         }
+        jedis.expire(sessionKey, SESSION_TIMEOUT);  // 滑动过期
         
-        jedis.expire(sessionKey, SESSION_TIMEOUT);
-        Map<String, String> sessionData = jedis.hgetAll(sessionKey);
-        
+        Map<String, String> data = jedis.hgetAll(sessionKey);
         Session session = new Session();
         session.setId(sessionId);
-        session.setUserId(sessionData.get("userId"));
-        session.setUsername(sessionData.get("username"));
-        session.setLoginTime(Long.parseLong(sessionData.get("loginTime")));
-        session.setLastAccessTime(Long.parseLong(sessionData.get("lastAccessTime")));
-        
+        session.setUserId(data.get("userId"));
+        session.setUsername(data.get("username"));
+        session.setLoginTime(Long.parseLong(data.get("loginTime")));
         return session;
     }
     
-    // 更新Session
+    // 更新 Session 属性
     public void updateSessionAttribute(String sessionId, String key, String value) {
         String sessionKey = SESSION_KEY_PREFIX + sessionId;
         jedis.hset(sessionKey, key, value);
         jedis.expire(sessionKey, SESSION_TIMEOUT);
     }
     
-    // 销毁Session
+    // 销毁 Session（登出）
     public void invalidateSession(String sessionId) {
-        String sessionKey = SESSION_KEY_PREFIX + sessionId;
-        jedis.del(sessionKey);
+        jedis.del(SESSION_KEY_PREFIX + sessionId);
     }
 }
 ```
-**Session管理最佳实践**：
-- **合理超时**：平衡安全性和用户体验设置Session超时
-- **数据序列化**：使用JSON或高效二进制序列化
-- **安全考虑**：Session ID随机生成，防止猜测攻击
+
+**最佳实践**：每次访问都刷新过期时间（滑动过期），保持活跃用户的登录状态；Session ID 用 UUID 随机生成，防止暴力猜测；敏感操作（如支付）前建议二次验证，不要完全依赖 Session 状态；生产环境更推荐 Spring Session + Redis 的集成方案，自动拦截 HTTP 请求，对应用代码透明。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#9-分布式-session|知识库：Redis 分布式 Session 实现]]
+
+---
+
 ###### 10. 如何使用 Redis 实现唯一 ID 生成?
-分布式ID生成需要保证全局唯一和趋势递增，Redis原子操作非常适合
+分布式 ID 需要保证全局唯一和趋势递增，Redis 的原子 `INCR` 命令是核心。
+
 ```java
 public class IdGeneratorService {
     private static final String ID_KEY_PREFIX = "id:generator:";
     
-    // 基于时间戳的ID生成（Twitter Snowflake风格）
+    // 基于时间戳 + 序列号的 ID 生成
     public long generateTimestampId(String businessType) {
         String key = ID_KEY_PREFIX + businessType;
         long timestamp = System.currentTimeMillis();
-        
-        // 日期格式：yyyyMMddHHmmssSSS + 序列号
-        String timestampStr = String.format("%d", timestamp);
         long sequence = jedis.incr(key);
+        jedis.expire(key, 1);  // 每秒重置序列号
         
-        // 重置序列号（每秒重置）
-        jedis.expire(key, 1);
-        
-        return Long.parseLong(timestampStr + String.format("%04d", sequence % 10000));
+        // 时间戳 17 位 + 序列号 4 位
+        return Long.parseLong(timestamp + String.format("%04d", sequence % 10000));
     }
     
-    // 分段ID生成（预分配号段）
+    // 号段模式（减少 Redis 访问次数）
     public class SegmentIdGenerator {
-        private String key;
         private long current = 0;
         private long max = 0;
-        private final int step = 1000; // 每次获取1000个ID
+        private final int step = 1000;  // 每次预申请 1000 个 ID
         
         public synchronized long nextId(String businessType) {
             if (current >= max) {
-                // 申请新号段
+                // 号段用完，批量申请下一段
                 String luaScript = 
                     "local key = KEYS[1]\n" +
                     "local step = tonumber(ARGV[1])\n" +
@@ -533,39 +535,38 @@ public class IdGeneratorService {
                 current = result.get(0);
                 max = result.get(1);
             }
-            
             return current++;
         }
     }
 }
 ```
-**ID生成方案对比**：
-- **自增ID**：简单但暴露业务量信息
-- **时间戳ID**：包含时间信息，适合时序查询
-- **号段模式**：减少Redis访问，性能更高
+
+**方案对比**：直接 `INCR` 简单可靠但每次都要访问 Redis，高并发下有瓶颈；**号段模式**每次批量申请一段 ID 缓存在本地，减少 Redis 访问次数，性能大幅提升，是美团 Leaf 等主流方案的核心思路；如果需要更高可用性（Redis 挂了也能生成 ID），可以用 Snowflake 算法（基于机器 ID + 时间戳 + 序列号），不依赖外部存储。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#10-唯一-id-生成|知识库：Redis 唯一 ID 生成]]
+
+---
+
 ###### 11. 如何使用 Redis 实现推荐系统?
-推荐系统利用Redis的**集合运算**和**有序集合**实现用户行为分析和相似度计算
+推荐系统利用 Redis 的**集合运算**和**有序集合**实现用户行为记录和物品相似度计算。
+
 ```java
 public class RecommendationService {
     private static final String USER_VIEW_PREFIX = "user:view:";
     private static final String ITEM_SIM_PREFIX = "item:sim:";
     
-    // 记录用户行为
+    // 记录用户行为（ZSet，按时间戳排序，保留最近 1000 条）
     public void recordUserAction(String userId, String itemId, String actionType, double weight) {
         String userActionKey = USER_VIEW_PREFIX + userId;
         jedis.zadd(userActionKey, System.currentTimeMillis(), 
             itemId + ":" + actionType + ":" + weight);
-        
-        // 保留最近1000个行为
-        jedis.zremrangeByRank(userActionKey, 0, -1001);
+        jedis.zremrangeByRank(userActionKey, 0, -1001);  // 只保留最新 1000 条
     }
     
-    // 基于物品的协同过滤
+    // 基于物品的协同过滤推荐
     public List<String> getItemBasedRecommendations(String userId, int maxResults) {
-        String userActionKey = USER_VIEW_PREFIX + userId;
-        Set<String> userActions = jedis.zrange(userActionKey, -10, -1); // 最近10个行为
+        Set<String> userActions = jedis.zrange(USER_VIEW_PREFIX + userId, -10, -1);
         
-        // 获取相似物品
         Pipeline pipeline = jedis.pipelined();
         for (String action : userActions) {
             String itemId = action.split(":")[0];
@@ -574,23 +575,20 @@ public class RecommendationService {
         
         List<Object> results = pipeline.syncAndReturnAll();
         Set<String> recommendations = new HashSet<>();
-        
         for (Object result : results) {
             @SuppressWarnings("unchecked")
-            Set<String> similarItems = (Set<String>) result;
-            recommendations.addAll(similarItems);
+            recommendations.addAll((Set<String>) result);
         }
         
         return new ArrayList<>(recommendations).subList(0, 
             Math.min(maxResults, recommendations.size()));
     }
     
-    // 计算物品相似度
+    // 计算物品相似度（Jaccard 相似度）
     public void calculateItemSimilarity(String itemId1, String itemId2) {
         String viewers1 = USER_VIEW_PREFIX + "items:" + itemId1;
         String viewers2 = USER_VIEW_PREFIX + "items:" + itemId2;
         
-        // 计算Jaccard相似度
         Long commonUsers = jedis.sinterstore("temp:common", viewers1, viewers2);
         Long unionUsers = jedis.sunionstore("temp:union", viewers1, viewers2);
         
@@ -602,108 +600,95 @@ public class RecommendationService {
     }
 }
 ```
-**推荐算法扩展**：
-- **实时热度榜**：基于时间衰减的分数计算
-- **用户画像**：使用哈希存储用户标签权重
-- **深度学习**：Redis作为特征存储，支持在线推理
+
+**扩展方向**：用时间衰减函数对历史行为降权（近期行为权重更高）；用 Hash 存储用户标签画像，支持基于内容的过滤；离线计算物品相似度矩阵（可以用 Spark），结果存到 Redis ZSet 里，在线推荐只做查询。Redis 在推荐系统中主要承担**特征存储**和**在线计算结果缓存**的角色。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#11-推荐系统|知识库：Redis 推荐系统实现]]
+
+---
+
 ###### 12. 如何使用 Redis 实现搜索自动补全?
-搜索补全基于**前缀匹配**，Redis的**有序集合**和**ZRANGEBYLEX**命令非常适合
+搜索补全基于**前缀匹配**，Redis 的有序集合 + `ZRANGEBYLEX` 命令支持字典序范围查询，非常适合这个场景。
+
 ```java
 public class AutoCompleteService {
     private static final String SUGGESTION_KEY = "search:suggestions";
     private static final String SCORE_KEY = "search:score";
     
-    // 添加搜索词
+    // 添加搜索词并建立前缀索引
     public void addSearchTerm(String term) {
-        // 使用分词生成前缀
+        // 将词条的所有前缀都存入 SUGGESTION_KEY（score 统一为 0，靠字典序排）
         for (int i = 1; i <= term.length(); i++) {
-            String prefix = term.substring(0, i);
-            jedis.zadd(SUGGESTION_KEY, 0, prefix);
+            jedis.zadd(SUGGESTION_KEY, 0, term.substring(0, i));
         }
-        
-        // 存储完整词条及其分数（热度）
+        // 记录完整词条的搜索热度
         jedis.zincrby(SCORE_KEY, 1, term);
     }
     
-    // 获取补全建议
+    // 获取补全建议（按热度排序）
     public List<String> getSuggestions(String prefix, int maxResults) {
-        String start = prefix;
-        String end = prefix + "\xff"; // 超出ASCII范围的字符
+        // ZRANGEBYLEX 获取以 prefix 开头的所有词条
+        Set<String> matched = jedis.zrangeByLex(SUGGESTION_KEY, 
+            "[" + prefix, "[" + prefix + "\xff");
         
-        // 获取匹配前缀的词条
-        Set<String> prefixes = jedis.zrangeByLex(SUGGESTION_KEY, 
-            "[" + start, "[" + end);
-        
-        // 根据热度排序返回建议
-        Set<Tuple> suggestions = jedis.zrevrangeWithScores(SCORE_KEY, 0, -1);
-        
-        return suggestions.stream()
+        // 从 SCORE_KEY 中按热度排序，过滤出匹配的词条
+        return jedis.zrevrangeWithScores(SCORE_KEY, 0, -1).stream()
             .map(Tuple::getElement)
             .filter(term -> term.startsWith(prefix))
             .limit(maxResults)
             .collect(Collectors.toList());
     }
     
-    // 增量更新词条热度
+    // 热度+1
     public void incrementScore(String term) {
         jedis.zincrby(SCORE_KEY, 1, term);
     }
 }
 ```
-**性能优化技巧**：
-- **前缀最小长度**：限制前缀索引的最小长度，减少存储
-- **热度衰减**：定期对分数进行衰减，反映最新趋势
-- **内存控制**：设置最大内存限制，避免无限增长
+
+**注意**：`ZRANGEBYLEX` 要求所有元素的 score 相同（通常设为 0），才能按字典序排序，否则排序结果不对。`"\xff"` 是 ASCII 最大字符，用作范围上界，表示"以 prefix 开头的所有字符串"。
+
+**性能优化**：限制前缀索引的最小长度（比如只存长度 ≥ 2 的前缀），减少存储；定期对热度分数做衰减，让结果反映最新趋势；中文场景需要先分词再建索引，比直接按字符前缀更准确。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#12-搜索自动补全|知识库：Redis 搜索自动补全实现]]
+
+---
+
 ###### 13. 如何使用 Redis 实现社交关系链?
-社交关系链包括关注、粉丝、好友等关系，**集合**和**有序集合**是核心数据结构
+社交关系链包括关注、粉丝、共同关注等，用**有序集合（ZSet）**存储，以关注时间戳作为 score，支持按时间排序分页。
+
 ```java
 public class SocialGraphService {
     private static final String FOLLOWING_PREFIX = "following:";
     private static final String FOLLOWERS_PREFIX = "followers:";
-    private static final String FRIENDS_PREFIX = "friends:";
     
-    // 关注用户
+    // 关注用户（双向写入）
     public void follow(String userId, String targetUserId) {
-        String followingKey = FOLLOWING_PREFIX + userId;
-        String followersKey = FOLLOWERS_PREFIX + targetUserId;
-        
         Transaction tx = jedis.multi();
-        tx.zadd(followingKey, System.currentTimeMillis(), targetUserId);
-        tx.zadd(followersKey, System.currentTimeMillis(), userId);
+        tx.zadd(FOLLOWING_PREFIX + userId, System.currentTimeMillis(), targetUserId);
+        tx.zadd(FOLLOWERS_PREFIX + targetUserId, System.currentTimeMillis(), userId);
         tx.exec();
     }
     
-    // 获取关注列表（带分页）
+    // 获取关注列表（按时间倒序分页）
     public List<String> getFollowing(String userId, int page, int size) {
-        String followingKey = FOLLOWING_PREFIX + userId;
         int start = (page - 1) * size;
-        int end = start + size - 1;
-        
-        Set<String> following = jedis.zrevrange(followingKey, start, end);
-        return new ArrayList<>(following);
+        return new ArrayList<>(jedis.zrevrange(FOLLOWING_PREFIX + userId, start, start + size - 1));
     }
     
-    // 获取共同关注
+    // 获取共同关注（ZINTERSTORE 求交集）
     public List<String> getCommonFollowing(String userId1, String userId2) {
-        String key1 = FOLLOWING_PREFIX + userId1;
-        String key2 = FOLLOWING_PREFIX + userId2;
-        
-        // 使用临时键存储交集
         String tempKey = "temp:common:following:" + userId1 + ":" + userId2;
-        jedis.zinterstore(tempKey, key1, key2);
-        
-        Set<String> common = jedis.zrange(tempKey, 0, -1);
+        jedis.zinterstore(tempKey, FOLLOWING_PREFIX + userId1, FOLLOWING_PREFIX + userId2);
+        List<String> common = new ArrayList<>(jedis.zrange(tempKey, 0, -1));
         jedis.del(tempKey);
-        
-        return new ArrayList<>(common);
+        return common;
     }
     
-    // 获取二度人脉（朋友的朋友）
+    // 获取二度人脉（关注的人关注了谁）
     public List<String> getSecondDegreeConnections(String userId) {
-        String followingKey = FOLLOWING_PREFIX + userId;
-        Set<String> directFollowing = jedis.zrange(followingKey, 0, -1);
+        Set<String> directFollowing = jedis.zrange(FOLLOWING_PREFIX + userId, 0, -1);
         
-        // 获取所有直接关注用户的关注列表
         Pipeline pipeline = jedis.pipelined();
         for (String followedUser : directFollowing) {
             pipeline.zrange(FOLLOWING_PREFIX + followedUser, 0, -1);
@@ -711,22 +696,18 @@ public class SocialGraphService {
         
         List<Object> results = pipeline.syncAndReturnAll();
         Set<String> secondDegree = new HashSet<>();
-        
         for (Object result : results) {
             @SuppressWarnings("unchecked")
-            Set<String> friendsOfFriends = (Set<String>) result;
-            secondDegree.addAll(friendsOfFriends);
+            secondDegree.addAll((Set<String>) result);
         }
         
-        // 排除直接关注和自己
-        secondDegree.removeAll(directFollowing);
-        secondDegree.remove(userId);
-        
+        secondDegree.removeAll(directFollowing);  // 排除已关注的人
+        secondDegree.remove(userId);              // 排除自己
         return new ArrayList<>(secondDegree);
     }
 }
 ```
-**关系链设计模式**：
-- **读写分离**：写操作使用事务，读操作使用管道
-- **数据同步**：定期将重要关系同步到数据库
-- **缓存策略**：对热点用户的关系进行缓存
+
+**关系链设计模式**：写操作用事务保证双向关系的一致性（关注同时写 following 和 followers）；读操作用 Pipeline 批量获取减少网络往返；关系数据同时写 Redis 和数据库，Redis 提供读取性能，数据库保证持久化；热点用户（大 V）的粉丝列表可能非常大，查询时需要限制范围，避免 `ZRANGE` 返回几百万条数据。
+
+> 📖 [[../../../23_RedisKnowledge/11_实战场景/01、常见实战场景实现#13-社交关系链|知识库：Redis 社交关系链实现]]

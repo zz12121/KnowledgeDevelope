@@ -1,52 +1,49 @@
 ###### 1. MyBatis 映射文件中有哪些常用标签？
-MyBatis映射文件中的标签可以分为多个类别，每个类别承担不同的职责：
+[[22_MybatisKnowledge/02_映射与SQL/01、映射文件与标签体系#1. 标签体系|📖]] MyBatis 映射文件中的标签按职责可以分为五大类。
 
-|**标签类别**​|**核心标签**​|**功能描述**​|
-|---|---|---|
-|**SQL语句标签**​|`<select>`, `<insert>`, `<update>`, `<delete>`|分别对应CRUD操作，是映射文件的基础|
-|**结果映射标签**​|`<resultMap>`, `<result>`, `<id>`, `<association>`, `<collection>`|定义查询结果与Java对象的映射关系|
-|**动态SQL标签**​|`<if>`, `<choose>`, `<when>`, `<otherwise>`, `<foreach>`, `<where>`, `<set>`, `<trim>`|根据条件动态生成SQL语句|
-|**辅助标签**​|`<sql>`, `<include>`|定义可重用的SQL片段|
-|**缓存标签**​|`<cache>`, `<cache-ref>`|配置缓存策略|
-**核心标签详解：**
-- **`<select>`标签**：最重要的查询标签，包含`id`(必选)、`parameterType`、`resultType`/`resultMap`、`flushCache`等属性
-- **`<insert>`标签**：支持`useGeneratedKeys`和`keyProperty`用于获取自增主键
-- **`<resultMap>`标签**：MyBatis最强大的特性，用于处理复杂的结果映射
+**SQL 语句标签**：`<select>`、`<insert>`、`<update>`、`<delete>`，分别对应 CRUD 操作，是映射文件最基础的部分。`<insert>` 支持 `useGeneratedKeys="true"` + `keyProperty="id"` 自动获取自增主键。
+
+**结果映射标签**：`<resultMap>`、`<result>`、`<id>`、`<association>`、`<collection>`，用于定义查询结果与 Java 对象的映射关系。`<id>` 专门映射主键字段，有助于缓存优化；`<association>` 处理一对一关系；`<collection>` 处理一对多关系。
+
+**动态 SQL 标签**：`<if>`、`<choose>`（`<when>`/`<otherwise>`）、`<foreach>`、`<where>`、`<set>`、`<trim>`，根据参数条件动态生成 SQL，这是 MyBatis 最强大的特性之一。
+
+**辅助标签**：`<sql>` 定义可复用的 SQL 片段，`<include>` 引用它，避免重复编写相同的字段列表或 WHERE 条件。
+
+**缓存标签**：`<cache>` 开启当前 Mapper 的二级缓存，`<cache-ref>` 引用其他 Mapper 的缓存配置。
+
 ###### 2. MyBatis 中 #{} 和 ${} 的区别是什么？
-两者在实现机制和安全性上有本质区别：
+[[22_MybatisKnowledge/02_映射与SQL/01、映射文件与标签体系#2. #{} vs ${}|📖]] 两者的本质区别是**预编译 vs 字符串替换**。
 
-|**特性**​|**#{}**​|**${}**​|
-|---|---|---|
-|**处理机制**​|**预编译处理**（PreparedStatement占位符）|**字符串替换**（直接拼接SQL）|
-|**安全性**​|**安全**，能有效防止SQL注入|**不安全**，存在SQL注入风险|
-|**引号处理**​|自动添加单引号，处理字符串类型|直接替换，不添加单引号|
-|**适用场景**​|参数值传递（WHERE条件值）|SQL关键字、表名、字段名等|
-**源码角度分析**：
-- **#{}实现**：在`org.apache.ibatis.scripting.xmltags.TextSqlNode`中，`#{}`会被解析为`?`占位符，通过`ParameterHandler`进行类型安全的值设置
-- **${}实现**：在`org.apache.ibatis.scripting.xmltags.TextSqlNode`中直接进行字符串替换，不进行预编译处理
-**示例对比**：
+**`#{}`** 会被解析成 `PreparedStatement` 的 `?` 占位符，参数值通过 `ParameterHandler` 以类型安全的方式绑定，自动处理单引号等特殊字符。这意味着参数值只作为"数据"被传入，不可能改变已编译的 SQL 结构，从根本上防止了 SQL 注入。
+
+**`${}`** 是纯字符串替换，在 SQL 生成时直接把变量值拼进去，不做任何转义处理。如果用户传入 `' OR '1'='1`，SQL 语义就被改变了，产生 SQL 注入漏洞。
+
 ```xml
-<!-- 安全写法 -->
+<!-- 安全：#{} 预编译，id=1 的情况下生成 WHERE id = ? 然后传入 1 -->
 <select id="getUserById" resultType="User">
-    SELECT * FROM user WHERE id = #{id}  <!-- 预编译：WHERE id = ? -->
+    SELECT * FROM user WHERE id = #{id}
 </select>
 
-<!-- 危险写法（SQL注入风险） -->
+<!-- 危险：${} 直接替换，攻击者可以注入任意 SQL -->
 <select id="getUserById" resultType="User">
-    SELECT * FROM user WHERE id = ${id}  <!-- 直接替换：WHERE id = 实际值 -->
+    SELECT * FROM user WHERE id = ${id}
 </select>
 
-<!-- ${}的正确使用场景 -->
+<!-- ${} 的合法场景：动态排序字段（非用户直接输入，需白名单校验） -->
 <select id="getAll" resultType="Goods">
-    SELECT * FROM goods ORDER BY price ${sort}  <!-- 排序字段 -->
+    SELECT * FROM goods ORDER BY ${sortField}
 </select>
 ```
+
+**记忆规则**：参数值用 `#{}`，SQL 片段（表名、列名、ORDER BY 字段）用 `${}`，且 `${}` 的值必须经过白名单校验。
+
 ###### 3. MyBatis 如何实现动态 SQL？
-MyBatis动态SQL允许根据参数条件动态生成SQL语句，主要通过OGNL表达式和一系列标签实现。
-**核心动态SQL标签：**
-1. **`<if>`标签**：基础条件判断
+[[22_MybatisKnowledge/02_映射与SQL/02、动态SQL|📖]] MyBatis 动态 SQL 通过一套标签体系 + OGNL 表达式实现，在 `org.apache.ibatis.scripting.xmltags` 包中每个标签对应一个 `SqlNode` 实现类，采用**解释器模式**。
+
+**`<if>` + `<where>`** 是最常用的组合，`<where>` 会自动去除多余的 `AND`/`OR` 前缀，避免 `WHERE AND name = ?` 这种语法错误：
+
 ```xml
-<select id="findUserByCondition" parameterType="map" resultType="User">
+<select id="findUserByCondition" resultType="User">
     SELECT * FROM users
     <where>
         <if test="name != null and name != ''">
@@ -58,262 +55,159 @@ MyBatis动态SQL允许根据参数条件动态生成SQL语句，主要通过OGNL
     </where>
 </select>
 ```
-1. **`<choose>`、`<when>`、`<otherwise>`标签**：多路选择（类似Java的switch-case）
+
+**`<choose>`/`<when>`/`<otherwise>`** 类似于 Java 的 switch-case，多个条件只执行第一个匹配的分支：
+
 ```xml
-<select id="findUser" parameterType="map" resultType="User">
-    SELECT * FROM users
-    <where>
-        <choose>
-            <when test="name != null">
-                AND name = #{name}
-            </when>
-            <when test="age != null">
-                AND age = #{age}
-            </when>
-            <otherwise>
-                AND status = 'active'
-            </otherwise>
-        </choose>
-    </where>
-</select>
+<where>
+    <choose>
+        <when test="name != null">AND name = #{name}</when>
+        <when test="age != null">AND age = #{age}</when>
+        <otherwise>AND status = 'active'</otherwise>
+    </choose>
+</where>
 ```
-1. **`<foreach>`标签**：遍历集合，常用于IN条件
+
+**`<foreach>`** 遍历集合，常用于 IN 条件和批量插入，注意 `collection` 属性值要对应参数类型（`list`/`array`/Map 的 key）：
+
 ```xml
-<select id="findUsersByIds" parameterType="list" resultType="User">
-    SELECT * FROM users
-    WHERE id IN
-    <foreach item="id" collection="list" open="(" separator="," close=")">
-        #{id}
-    </foreach>
-</select>
+WHERE id IN
+<foreach item="id" collection="list" open="(" separator="," close=")">
+    #{id}
+</foreach>
 ```
-1. **`<where>`和`<set>`标签**：智能处理SQL关键字
-    - **`<where>`**：自动去除多余的AND/OR，避免WHERE后面直接跟AND的错误
-    - **`<set>`**：自动去除末尾多余的逗号，用于UPDATE语句
-**源码机制**：动态SQL在`org.apache.ibatis.scripting.xmltags`包中实现，采用**解释器模式**，每个标签对应一个具体的SqlNode实现类。
+
+**`<set>`** 用于 UPDATE 语句，自动去除末尾多余的逗号，与 `<where>` 是一对好搭档：
+
+```xml
+<update id="updateUser">
+    UPDATE user
+    <set>
+        <if test="name != null">name = #{name},</if>
+        <if test="age != null">age = #{age},</if>
+    </set>
+    WHERE id = #{id}
+</update>
+```
+
 ###### 4. MyBatis 中 if、choose、foreach 标签的使用场景是什么？
+[[22_MybatisKnowledge/02_映射与SQL/02、动态SQL#2. 标签详解|📖]] **`<if>`** 适合多条件同时满足的场景，比如多字段模糊搜索——有什么参数就追加什么条件。需要配合 `<where>` 使用，避免第一个条件前有多余的 AND。
 
-|**标签**​|**使用场景**​|**示例**​|**注意事项**​|
-|---|---|---|---|
-|**`<if>`**​|简单的条件判断，多个条件同时满足|多条件查询过滤|配合`<where>`使用避免语法错误|
-|**`<choose>`**​|多选一场景，类似if-else if-else|根据不同类型采用不同查询策略|只有一个分支会被执行|
-|**`<foreach>`**​|遍历集合，构建IN条件或批量操作|批量插入、批量删除、IN查询|注意collection属性值（list/array/map）|
-**实战示例**：
-```xml
-<!-- 批量插入 -->
-<insert id="batchInsert" parameterType="list">
-    INSERT INTO users (name, age) VALUES
-    <foreach collection="list" item="user" separator=",">
-        (#{user.name}, #{user.age})
-    </foreach>
-</insert>
+**`<choose>`** 适合多选一的场景，类似 if-else if-else 逻辑。比如：有 ID 就按 ID 查，有手机号就按手机号查，都没有就返回最近注册的用户。只有一个分支会被执行。
 
-<!-- 复杂条件查询 -->
-<select id="searchUsers" parameterType="map" resultType="User">
-    SELECT * FROM users
-    <where>
-        <if test="ids != null and ids.size() > 0">
-            id IN
-            <foreach collection="ids" item="id" open="(" separator="," close=")">
-                #{id}
-            </foreach>
-        </if>
-        <choose>
-            <when test="status != null">
-                AND status = #{status}
-            </when>
-            <otherwise>
-                AND status = 'ACTIVE'
-            </otherwise>
-        </choose>
-    </where>
-</select>
-```
+**`<foreach>`** 有三个典型场景：IN 条件查询（`WHERE id IN (1,2,3)`）、批量插入（INSERT INTO VALUES (...),(...)`）、批量更新。注意 `collection` 参数：传 `List` 时写 `list`，传数组写 `array`，传 Map 时写对应的 key 名。建议大批量操作分批处理，每批 500~1000 条。
+
 ###### 5. MyBatis 如何处理 SQL 注入问题？
-MyBatis通过多层防御机制处理SQL注入问题：
-**1. 预编译机制（最主要防御）**
-- **#{}占位符**：所有使用`#{}`的参数都会经过预编译处理，参数值不会改变SQL结构
-- **底层实现**：基于`PreparedStatement`，数据库先编译SQL结构，再传入参数值
-**2. 严格的输入验证**
-```java
-// 应用层验证示例
-public List<User> searchUsers(SearchParams params) {
-    if (params.getName() != null && !isValidName(params.getName())) {
-        throw new IllegalArgumentException("Invalid name parameter");
-    }
-    return userMapper.searchUsers(params);
-}
-```
-**3. 安全的${}使用规范**
-- 永远不要用`${}`接收用户输入的参数值
-- `${}`仅用于SQL关键字、表名、字段名等不可信源可控的场景
-```xml
-<!-- 安全使用${}的场景 -->
-<select id="selectWithOrder" resultType="User">
-    SELECT * FROM users 
-    ORDER BY ${orderColumn} ${orderDirection}
-</select>
-```
-**4. MyBatis的安全配置**
-- 启用MyBatis的日志功能，监控生成的SQL
-- 使用MyBatis的SQL过滤器进行参数校验
-###### 6. MyBatis 中 resultType 和 resultMap 的区别是什么？
+[[22_MybatisKnowledge/02_映射与SQL/01、映射文件与标签体系#2. #{} vs ${}|📖]] MyBatis 防 SQL 注入的核心是**彻底使用 `#{}`**，它底层基于 `PreparedStatement` 预编译，参数被视为纯数据，无法改变 SQL 语义。
 
-|**特性**​|**resultType**​|**resultMap**​|
-|---|---|---|
-|**映射方式**​|自动映射（属性名=列名）|手动映射（自定义映射关系）|
-|**复杂度**​|简单场景适用|复杂场景（关联查询、继承等）|
-|**灵活性**​|低|高，支持嵌套映射、集合映射等|
-|**性能**​|自动映射有一定开销|精确控制，通常性能更好|
-**使用场景对比**：
-**resultType示例**（简单映射）：
-```xml
-<select id="getAllUsers" resultType="com.example.User">
-    SELECT user_id, user_name, email FROM users
-</select>
-```
-**resultMap示例**（复杂映射）：
-```xml
-<resultMap id="userDetailMap" type="User">
-    <id property="id" column="user_id"/>
-    <result property="username" column="user_name"/>
-    <result property="email" column="email"/>
-    <association property="department" javaType="Department">
-        <id property="id" column="dept_id"/>
-        <result property="name" column="dept_name"/>
-    </association>
-    <collection property="roles" ofType="Role">
-        <id property="id" column="role_id"/>
-        <result property="name" column="role_name"/>
-    </collection>
-</resultMap>
-```
+需要特别注意的是 `${}` 的使用场景。动态表名、动态排序字段确实需要用 `${}`，但这些值绝对不能来自用户未经校验的输入——必须在代码层面做**白名单校验**，确保只有合法的表名或列名才能被拼入 SQL。
+
+此外，应用层的输入验证也是防线之一：在 Service 层对参数进行长度、格式校验，拒绝异常输入，不要完全依赖框架层面的防护。
+
+###### 6. MyBatis 中 resultType 和 resultMap 的区别是什么？
+[[22_MybatisKnowledge/02_映射与SQL/01、映射文件与标签体系#3. resultType vs resultMap|📖]] 两者的核心区别是**自动映射 vs 手动映射**。
+
+**`resultType`** 适用于简单场景：查询结果的列名与 Java 对象的属性名完全一致（或开启了驼峰转换后一致）。MyBatis 自动完成映射，写法简单。
+
+**`resultMap`** 适用于复杂场景：列名与属性名不一致、需要关联查询（一对一的 `<association>`、一对多的 `<collection>`）、需要自定义 TypeHandler 等。需要手动配置映射关系，但更灵活强大。
+
+**两者不能同时使用**，同一个 `<select>` 标签只能指定 `resultType` 或 `resultMap` 其中之一。
+
 ###### 7. MyBatis 如何实现结果映射？
-MyBatis的结果映射是通过`ResultMap`和`ResultSetHandler`组件协作完成的：
-**1. 结果映射的层次结构**：
-- **基本字段映射**：`<result>`标签处理简单字段映射
-- **主键映射**：`<id>`标签优化缓存和性能
-- **关联映射**：`<association>`处理一对一、多对一关系
-- **集合映射**：`<collection>`处理一对多关系
-**2. 源码实现机制**：
-在`org.apache.ibatis.executor.resultset.DefaultResultSetHandler`中：
-```java
-// 简化版源码逻辑
-while (resultSet.next()) {
-    Object rowValue = getRowValue(resultSet, mappedStatement.getResultMaps());
-    // 将行数据映射到对象
-}
-```
-**3. 自动映射原理**：
-- 基于列名与属性名的匹配（下划线转驼峰）
-- 可通过`mapUnderscoreToCamelCase`配置开启自动转换
+[[22_MybatisKnowledge/02_映射与SQL/03、结果映射与关联查询|📖]] 结果映射由 `DefaultResultSetHandler` 完成，核心流程是遍历 ResultSet 的每一行，根据 `ResultMap` 的配置将行数据转换为 Java 对象。
+
+简单字段通过 `<result column="xxx" property="yyy"/>` 映射；开启 `mapUnderscoreToCamelCase` 后，`user_name` 这类下划线命名自动映射到 `userName`。关联对象通过 `<association>` 和 `<collection>` 处理嵌套映射或嵌套查询。
+
 ###### 8. MyBatis 如何处理字段名与属性名不一致的情况？
-有三种主要处理方式：
-**1. 设置全局自动映射（推荐）**
+[[22_MybatisKnowledge/02_映射与SQL/01、映射文件与标签体系#4. 字段名不一致处理|📖]] 有三种方式解决字段名与属性名不一致的问题。
+
+**方式一（推荐）：全局开启驼峰转换**，适合数据库用下划线命名、Java 用驼峰命名的标准规范：
+
 ```xml
-<!-- mybatis-config.xml -->
-<settings>
-    <setting name="mapUnderscoreToCamelCase" value="true"/>
-</settings>
+<setting name="mapUnderscoreToCamelCase" value="true"/>
 ```
-自动将`user_name`映射到`userName`属性
-**2. 使用resultMap手动映射**
+
+这样 `user_name` 自动对应 `userName`，`create_time` 自动对应 `createTime`，一行配置解决大部分场景。
+
+**方式二：使用 `resultMap` 手动配置**，适合非标准命名或特殊映射需求：
+
 ```xml
 <resultMap id="userMap" type="User">
     <id property="id" column="user_id"/>
     <result property="username" column="user_name"/>
-    <result property="createTime" column="create_time"/>
 </resultMap>
+```
 
-<select id="getUser" resultMap="userMap">
-    SELECT user_id, user_name, create_time FROM users
-</select>
-```
-**3. 使用SQL别名**
+**方式三：SQL 别名**，在查询语句中直接用 AS 起别名，简单直接但写起来麻烦，不推荐大量使用：
+
 ```xml
-<select id="getUser" resultType="User">
-    SELECT 
-        user_id as id, 
-        user_name as username, 
-        create_time as createTime
-    FROM users
-</select>
+SELECT user_id as id, user_name as username FROM users
 ```
+
 ###### 9. MyBatis 中如何实现一对一、一对多、多对多关联查询？
-**一对一关联**（使用`<association>`）：
+[[22_MybatisKnowledge/02_映射与SQL/03、结果映射与关联查询#2. 关联映射|📖]] 一对一用 `<association>`，一对多用 `<collection>`，多对多本质是两个一对多（通过中间表实现）。
+
+**一对一**（订单关联用户）：
+
 ```xml
 <resultMap id="orderDetailMap" type="Order">
     <id property="id" column="order_id"/>
-    <result property="orderNo" column="order_no"/>
     <association property="user" javaType="User">
         <id property="id" column="user_id"/>
         <result property="username" column="username"/>
     </association>
 </resultMap>
 ```
-**一对多关联**（使用`<collection>`）：
+
+**一对多**（用户关联订单列表）：
+
 ```xml
 <resultMap id="userOrderMap" type="User">
     <id property="id" column="user_id"/>
-    <result property="username" column="username"/>
     <collection property="orders" ofType="Order">
         <id property="id" column="order_id"/>
         <result property="orderNo" column="order_no"/>
     </collection>
 </resultMap>
 ```
-**多对多关联**（通过中间表）：
-```xml
-<resultMap id="userRoleMap" type="User">
-    <id property="id" column="user_id"/>
-    <result property="username" column="username"/>
-    <collection property="roles" ofType="Role">
-        <id property="id" column="role_id"/>
-        <result property="name" column="role_name"/>
-    </collection>
-</resultMap>
 
+**多对多**通过中间表 JOIN 实现，映射方式与一对多相同，SQL 里多一个 JOIN：
+
+```xml
 <select id="getUserWithRoles" resultMap="userRoleMap">
-    SELECT u.*, r.* 
+    SELECT u.*, r.role_id, r.role_name
     FROM users u
     LEFT JOIN user_role ur ON u.user_id = ur.user_id
     LEFT JOIN roles r ON ur.role_id = r.role_id
     WHERE u.user_id = #{userId}
 </select>
 ```
+
 ###### 10. MyBatis 的延迟加载是什么？如何配置？
-**延迟加载**（Lazy Loading）是MyBatis的高级特性，只有在真正使用关联对象时才执行查询。
-**配置方式**：
+[[22_MybatisKnowledge/02_映射与SQL/03、结果映射与关联查询#4. 延迟加载|📖]] **延迟加载**是指关联对象不在主查询时加载，而是等到真正访问该属性时才触发查询。适合关联数据不是每次都会用到的场景，避免无谓的查询开销。
+
 ```xml
-<!-- mybatis-config.xml -->
 <settings>
     <setting name="lazyLoadingEnabled" value="true"/>
-    <setting name="aggressiveLazyLoading" value="false"/>
+    <setting name="aggressiveLazyLoading" value="false"/>  <!-- 按需加载，不要激进 -->
 </settings>
-
-<!-- 或在resultMap中单独配置 -->
-<resultMap id="userOrderMap" type="User">
-    <collection property="orders" ofType="Order" 
-                select="selectOrdersByUserId" column="user_id"
-                fetchType="lazy"/>
-</resultMap>
 ```
-**源码机制**：延迟加载通过动态代理实现，当访问关联属性时，代理对象会触发实际的SQL查询。
+
+或者在 `resultMap` 中通过 `fetchType="lazy"` 单独控制：
+
+```xml
+<collection property="orders" ofType="Order"
+            select="selectOrdersByUserId" column="user_id"
+            fetchType="lazy"/>
+```
+
+**实现原理**：通过 CGLIB 或 Javassist 生成的动态代理实现，当访问 `user.getOrders()` 时，代理对象检测到 orders 还未加载，自动触发 `selectOrdersByUserId` 查询。
+
+**注意**：延迟加载本质上还是 N+1 查询，只是把查询时机推迟了。如果场景是遍历用户列表并访问每个用户的订单，延迟加载并不能减少 SQL 次数，这种情况应该用 JOIN 或批量 IN 查询。
+
 ###### 11. MyBatis 的 association 和 collection 标签有什么区别？
+[[22_MybatisKnowledge/02_映射与SQL/03、结果映射与关联查询#2. 关联映射|📖]] 两者的区别很简单：**`<association>` 映射单个对象（一对一），`<collection>` 映射对象集合（一对多）**。
 
-|**特性**​|**association**​|**collection**​|
-|---|---|---|
-|**映射关系**​|一对一、多对一|一对多、多对多|
-|**Java类型**​|单个对象（`javaType`）|对象集合（`ofType`）|
-|**使用场景**​|订单-用户、员工-部门|用户-订单、部门-员工|
-|**嵌套查询**​|支持`select`属性|同样支持`select`属性|
-**association示例**（多对一）：
-```xml
-<association property="department" javaType="Department" 
-             select="selectDepartmentById" column="dept_id"/>
-```
-**collection示例**（一对多）：
-```xml
-<collection property="employees" ofType="Employee" 
-            select="selectEmployeesByDeptId" column="dept_id"/>
-```
+`<association>` 使用 `javaType` 指定关联对象的 Java 类型（如 `javaType="User"`）；`<collection>` 使用 `ofType` 指定集合元素的 Java 类型（如 `ofType="Order"`）。
+
+两者都支持通过 `select` 属性触发嵌套查询（懒加载），也都支持通过内嵌字段映射实现 JOIN 查询结果的映射。

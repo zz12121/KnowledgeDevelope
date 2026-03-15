@@ -1,63 +1,83 @@
 ###### 1. 什么是 Spring Bean？
-**Spring Bean**是由Spring IoC容器**实例化、组装和管理的对象**，是Spring应用程序的基本构建块。与普通Java对象不同，Bean的生命周期完全由Spring容器控制。
-**核心特征**：
-- **容器管理**：Bean由Spring IoC容器创建和管理，不直接通过`new`关键字实例化
-- **配置元数据**：通过XML、注解或Java配置类定义Bean的创建规则
-- **依赖注入**：容器自动处理Bean之间的依赖关系
-- **生命周期回调**：支持初始化/销毁回调方法
-**源码角度**：Spring通过`BeanDefinition`接口描述Bean的元数据，包括类名、作用域、属性值等。容器启动时，`BeanDefinitionReader`读取配置并注册到`BeanDefinitionRegistry`，最后由`BeanFactory`根据这些定义创建Bean实例。
-**与普通对象的区别**：
-```java
-// 普通对象：直接new创建，完全由程序控制
-User user = new User();
 
-// Spring Bean：由容器管理，通过ApplicationContext获取
-ApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
-User user = context.getBean("user", User.class);
-```
+Spring Bean 就是由 Spring IoC 容器**实例化、组装和管理的对象**，是 Spring 应用的基本构建块。
+
+跟普通 Java 对象最大的区别是：普通对象你自己 `new`，自己管，自己销毁；Bean 的整个生命周期全交给容器，你只需要告诉容器"我要用这个类当 Bean"，容器负责创建、注入依赖、初始化、最后销毁。
+
+容器内部用 `BeanDefinition` 来描述每个 Bean 的元数据，包括类名、作用域、依赖关系、初始化方法等。`BeanDefinitionReader` 负责读取配置（XML/注解/Java Config），注册到 `BeanDefinitionRegistry`，最后 `BeanFactory` 根据这些元数据创建实例。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#一、Bean 的定义与注册]]
+
+---
+
 ###### 2. Spring 中 Bean 的作用域有哪些？
-Spring支持6种Bean作用域，控制Bean实例的创建方式和生命周期：
 
-|作用域|描述|适用场景|配置方式|
-|---|---|---|---|
-|**singleton**​|默认作用域，整个容器中只有一个实例|无状态Bean，如Service、DAO|`@Scope("singleton")`|
-|**prototype**​|每次请求都创建新实例|有状态Bean，需要隔离的场景|`@Scope("prototype")`|
-|**request**​|每次HTTP请求创建新实例|Web应用中的请求相关数据|`@Scope("request")`|
-|**session**​|每个HTTP会话期间一个实例|用户会话数据管理|`@Scope("session")`|
-|**application**​|整个Web应用生命周期一个实例|全局应用级数据|`@Scope("application")`|
-|**websocket**​|每个WebSocket会话一个实例|WebSocket通信场景|`@Scope("websocket")`|
-**源码机制**：作用域通过`Scope`接口实现。`SingletonScope`使用ConcurrentHashMap缓存实例，而`PrototypeScope`每次调用`getBean()`时都通过反射创建新对象。
-**线程安全考虑**：singleton作用域的Bean需要确保线程安全，而prototype作用域每个线程有独立实例，天然线程安全但内存开销大。
+Spring 支持 6 种作用域，控制 Bean 实例的创建方式：
+
+**singleton（默认）**：整个容器只有一个实例，所有获取该 Bean 的地方拿到的都是同一个对象。适合无状态的 Service、DAO 类。注意：singleton 不等于线程安全，多线程访问时要自己保证线程安全。
+
+**prototype**：每次 `getBean()` 都创建一个新实例。适合有状态的对象，天然线程安全，但创建销毁频繁会增加内存开销，且容器不负责销毁 prototype Bean。
+
+**request**：每次 HTTP 请求创建一个实例，请求结束自动销毁。仅 Web 应用中有效。
+
+**session**：每个 HTTP 会话一个实例，会话结束销毁。适合存用户会话数据。
+
+**application**：整个 Web 应用生命周期只有一个实例，类似 singleton，但绑定的是 `ServletContext`。
+
+**websocket**：每个 WebSocket 会话一个实例。
+
+配置方式：`@Scope("prototype")`，或在 XML 里 `scope="prototype"`。
+
+**一个坑**：singleton Bean 注入 prototype Bean 时，拿到的 prototype 对象不会每次都刷新（因为 singleton 只初始化一次，依赖注入也只发生一次）。解决方式：让 singleton Bean 实现 `ApplicationContextAware`，每次使用时手动 `getBean()`；或者用 `@Lookup` 注解。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#三、Bean 的 6 种作用域]]
+
+---
+
 ###### 3. Spring Bean 的生命周期是怎样的？
-Spring Bean的生命周期包含以下完整阶段：
-1. **实例化**：容器调用构造函数创建Bean实例
-2. **属性填充**：通过setter或字段注入依赖关系
-3. **Aware接口回调**：执行`BeanNameAware`、`BeanFactoryAware`等接口方法
-4. **前置处理**：`BeanPostProcessor`的`postProcessBeforeInitialization()`方法
-5. **初始化**：执行`@PostConstruct`、`InitializingBean.afterPropertiesSet()`和自定义init方法
-6. **后置处理**：`BeanPostProcessor`的`postProcessAfterInitialization()`方法
-7. **使用期**：Bean完全初始化，可供业务使用
-8. **销毁前处理**：执行`@PreDestroy`方法
-9. **销毁**：执行`DisposableBean.destroy()`和自定义destroy方法
-**源码体现**：在`AbstractAutowireCapableBeanFactory.doCreateBean()`方法中完整实现了这一流程。关键的`initializeBean()`方法处理初始化回调，而`destroyBean()`处理销毁逻辑。
+
+Bean 的完整生命周期分 9 个阶段，整个流程在 `AbstractAutowireCapableBeanFactory.doCreateBean()` 里实现：
+
+**1. 实例化**：调用构造函数创建原始对象（还没设置任何属性）
+
+**2. 属性填充**：通过 setter 或字段注入依赖关系，调用 `populateBean()` 方法
+
+**3. Aware 接口回调**：如果 Bean 实现了 `BeanNameAware`、`BeanFactoryAware`、`ApplicationContextAware`，依次调用对应方法，让 Bean 感知自己的容器环境
+
+**4. BeanPostProcessor 前置处理**：调用所有 `BeanPostProcessor.postProcessBeforeInitialization()`，这里 Spring 自己的很多功能也是在这里插入的
+
+**5. 初始化**：依次执行 `@PostConstruct` 方法 → `InitializingBean.afterPropertiesSet()` → 自定义 `init-method`
+
+**6. BeanPostProcessor 后置处理**：调用所有 `BeanPostProcessor.postProcessAfterInitialization()`，**AOP 代理就是在这里创建的**
+
+**7. 使用阶段**：Bean 完全就绪，进入正常使用状态
+
+**8. 销毁前**：容器关闭时，执行 `@PreDestroy` 方法
+
+**9. 销毁**：执行 `DisposableBean.destroy()` → 自定义 `destroy-method`
+
+注意：prototype 作用域的 Bean，容器只负责创建，不负责销毁。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#四、Bean 生命周期的 9 个阶段]]
+
+---
+
 ###### 4. 如何在 Spring 中配置 Bean？
-Spring提供三种主要的Bean配置方式：
-**XML配置**（传统方式）：
-```xml
-<bean id="userService" class="com.example.UserService">
-    <property name="userDao" ref="userDao"/>
-    <property name="timeout" value="5000"/>
-</bean>
-```
-**注解配置**（现代首选）：
+
+Spring 提供三种配置方式，现代项目通常混合使用：
+
+**注解配置（现代首选）**：在类上加 `@Component`/`@Service`/`@Repository`/`@Controller`，配合 `@ComponentScan` 自动扫描注册：
+
 ```java
-@Component
+@Service
 public class UserService {
     @Autowired
     private UserDao userDao;
 }
 ```
-**Java配置类**（显式控制）：
+
+**Java Config（显式控制，适合第三方库集成）**：用 `@Configuration` + `@Bean` 方法显式定义：
+
 ```java
 @Configuration
 public class AppConfig {
@@ -65,194 +85,226 @@ public class AppConfig {
     public UserService userService() {
         return new UserService(userDao());
     }
-    
-    @Bean 
+
+    @Bean
     public UserDao userDao() {
         return new UserDaoImpl();
     }
 }
 ```
-**选择建议**：现代Spring项目推荐以注解配置为主，复杂依赖或第三方库集成使用Java配置，遗留系统可能仍需XML配置。
-###### 5. 什么是 Bean 的装配？有哪些装配方式？
-**Bean装配**是指**创建Bean之间协作关系的过程**，即依赖注入的实现。主要有两种装配方式：
-**显式装配**：手动明确指定依赖关系
-- **构造器注入**：通过构造函数注入依赖
-```java
-public class UserService {
-    private final UserDao userDao;
-    
-    public UserService(UserDao userDao) {
-        this.userDao = userDao;
-    }
-}
-```
-- **Setter注入**：通过setter方法注入
-```java
-public class UserService {
-    private UserDao userDao;
-    
-    public void setUserDao(UserDao userDao) {
-        this.userDao = userDao;
-    }
-}
-```
-**隐式装配（自动装配）**：容器根据规则自动建立依赖关系，包括byType、byName等方式。
-###### 6. 什么是自动装配？自动装配有哪些方式？
-**自动装配**是Spring容器**自动建立Bean之间依赖关系**的机制，减少显式配置。
-**自动装配模式**：
 
-|模式|说明|优点|缺点|
-|---|---|---|---|
-|**byType**​|按类型自动装配|类型安全，配置简单|同类型多个Bean时失败|
-|**byName**​|按名称自动装配|明确指定目标Bean|需要属性名与Bean名一致|
-|**constructor**​|构造器参数自动装配|保证依赖完全初始化|复杂构造器时配置困难|
-|**no**​|默认，不自动装配|完全控制依赖关系|配置工作量大|
-**配置方式**：
+**XML 配置（遗留项目）**：
+
+```xml
+<bean id="userService" class="com.example.UserService">
+    <property name="userDao" ref="userDao"/>
+</bean>
+```
+
+**选择建议**：业务代码用注解，第三方库或需要精细控制的 Bean 用 Java Config，尽量避免 XML（维护成本高）。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#二、三种 Bean 配置方式]]
+
+---
+
+###### 5. 什么是 Bean 的装配？有哪些装配方式？
+
+Bean 装配就是**建立 Bean 之间协作关系的过程**，也就是依赖注入的实现。
+
+**显式装配**：手动指定依赖，控制精确：
+
+- 构造器注入：依赖通过构造函数传入，推荐，保证不可变
+- Setter 注入：通过 Setter 方法设置，适合可选依赖
+
+**隐式自动装配（Auto-wiring）**：容器根据规则自动匹配：
+
+- `byType`：按类型找，最常用，找不到或找到多个会报错
+- `byName`：按 Bean 名称找，要求属性名和 Bean 名一致
+- `constructor`：构造器参数按类型匹配
+- `no`：不自动装配，手动指定（XML 的默认值）
+
+实际开发中，`@Autowired`（byType）+ `@Qualifier`（指定名称解歧义）是最常见的组合。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#五、@Autowired vs @Resource]]
+
+---
+
+###### 6. 什么是自动装配？自动装配有哪些方式？
+
+自动装配是容器**自动建立 Bean 之间依赖关系**的机制，不需要手动写注入代码。
+
+Spring 的自动装配主要通过 `@Autowired` 注解实现，核心逻辑是 `byType`：先按类型找，找到多个再按名称筛选（结合 `@Qualifier`）。
+
 ```java
 @Component
 public class UserService {
-    @Autowired // byType自动装配
-    private UserDao userDao;
-    
+    // byType 自动装配
     @Autowired
-    public UserService(@Qualifier("specificDao") UserDao dao) {
-        // constructor自动装配
-    }
+    private UserDao userDao;
+
+    // byType 找到多个时，@Qualifier 指定具体 Bean
+    @Autowired
+    @Qualifier("primaryUserDao")
+    private UserDao primaryDao;
 }
 ```
-**最佳实践**：推荐使用`@Autowired`进行byType装配，配合`@Qualifier`解决歧义性问题。
+
+`@Autowired` 默认 `required = true`，找不到依赖直接报错。如果是可选依赖，可以设置 `@Autowired(required = false)` 或者用 `Optional<T>` 包装。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#五、@Autowired vs @Resource]]
+
+---
+
 ###### 7. @Autowired 和 @Resource 的区别是什么？
-|特性|@Autowired|@Resource|
-|---|---|---|
-|**来源**​|Spring框架注解|JSR-250标准注解|
-|**默认行为**​|按类型装配|按名称装配|
-|**名称指定**​|需配合@Qualifier|自带name属性|
-|**required属性**​|支持|不支持|
-|**适用场景**​|纯Spring环境|需要标准化的场景|
-**使用示例**：
+
+这两个注解都是用来注入依赖的，但来源和默认行为不同：
+
+**`@Autowired`** 是 Spring 自己的注解，默认按**类型（byType）**查找，找到多个再配合 `@Qualifier` 按名称筛选。支持 `required = false`。
+
+**`@Resource`** 是 JSR-250 标准注解（Java 规范，不依赖 Spring），默认按**名称（byName）**查找，找不到再按类型退化。自带 `name` 属性可以直接指定 Bean 名称。
+
 ```java
 @Component
 public class ExampleService {
-    @Autowired // 按类型匹配
-    @Qualifier("mainDao") // 明确指定Bean名称
+    @Autowired                          // byType，找 UserDao 类型的 Bean
+    @Qualifier("mainDao")               // 找到多个时，指定名称
     private UserDao userDao;
-    
-    @Resource(name = "secondaryDao") // 按名称匹配
+
+    @Resource(name = "secondaryDao")    // 直接按名称 "secondaryDao" 找
     private UserDao anotherDao;
 }
 ```
-###### 8. @Component、@Service、@Controller、@Repository 的区别是什么？
-这四个注解都是**组件扫描的标记注解**，本质功能相同，但用于不同层次体现语义差异：
 
-|注解|层级|特殊功能|使用场景|
-|---|---|---|---|
-|**@Component**​|通用组件|无|通用组件类|
-|**@Service**​|业务层|无|业务逻辑实现类|
-|**@Controller**​|表现层|MVC控制器识别|Web请求处理类|
-|**@Repository**​|持久层|自动转换数据访问异常|数据访问层类|
-**源码角度**：这些注解都被`@Component`元注解标记，组件扫描时统一处理。`@Repository`通过`PersistenceExceptionTranslationPostProcessor`将特定数据访问异常转换为Spring的统一异常体系。
+**如何选？** 纯 Spring 项目用 `@Autowired`，配合 `@Qualifier` 够用；需要跨框架可移植性（比如 Jakarta EE 项目）用 `@Resource`。日常开发两个都行，统一风格就好。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#五、@Autowired vs @Resource]]
+
+---
+
+###### 8. @Component、@Service、@Controller、@Repository 的区别是什么？
+
+这四个注解的底层功能完全一样，都是用来标记"这个类要被 Spring 管理为 Bean"。区别在于语义层面，体现分层架构：
+
+- **`@Component`**：通用组件，不属于特定层次，哪里都能用
+- **`@Service`**：业务逻辑层，标记 Service 类
+- **`@Controller`**：表现层，标记 MVC 的 Controller，Spring MVC 会识别它来处理请求映射
+- **`@Repository`**：持久层，标记 DAO 类。有一个特殊能力：通过 `PersistenceExceptionTranslationPostProcessor`，会把底层的 JDBC/JPA/MyBatis 异常统一转换为 Spring 的 `DataAccessException` 体系
+
+源码上，`@Service`、`@Controller`、`@Repository` 都是用 `@Component` 作为元注解，组件扫描时统一处理，没有本质区别。
+
+**推荐按语义选**：代码可读性更好，团队看一眼注解就知道这个类的职责。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#六、@Component 系列注解的语义差异]]
+
+---
+
 ###### 9. 如何解决循环依赖问题？
-**循环依赖**指Bean之间**相互依赖形成闭环**的情况，如A依赖B，B又依赖A。
-**Spring的解决方案**：使用**三级缓存**机制：
-1. **singletonObjects**：缓存完整的Bean实例
-2. **earlySingletonObjects**：缓存提前暴露的原始对象
-3. **singletonFactories**：缓存ObjectFactory，用于创建代理对象
-**解决条件**：
-- 仅适用于singleton作用域的Bean
-- 依赖通过setter或字段注入（构造器注入无法解决）
-- 没有自定义BeanPostProcessor干预创建过程
-**避免策略**：
-- 使用`@Lazy`延迟加载一方依赖
-- 提取公共逻辑到第三个Bean中
-- 使用ApplicationContext.getBean()显式获取依赖
+
+循环依赖是 A 依赖 B、B 又依赖 A（或更长的依赖环）。Spring 通过**三级缓存**解决了 singleton + setter/字段注入的循环依赖。
+
+三级缓存的三层 Map：
+- **一级缓存（singletonObjects）**：存放完全初始化好的单例 Bean
+- **二级缓存（earlySingletonObjects）**：存放早期暴露的 Bean（已实例化但未完成初始化）
+- **三级缓存（singletonFactories）**：存放 `ObjectFactory`，用于在需要时生成代理对象
+
+**解决过程**：A 开始创建 → 实例化 A（半成品）→ 把 A 的 `ObjectFactory` 放入三级缓存 → 注入依赖发现需要 B → 开始创建 B → B 需要 A → 从三级缓存拿到 A 的工厂，生成早期 A 放入二级缓存 → B 完成初始化 → A 拿到 B，继续完成初始化 → A 进入一级缓存。
+
+**但有限制**：只能解决 singleton Bean 的 setter/字段注入循环依赖。**构造器注入的循环依赖无法解决**（因为实例化阶段就需要依赖，还没机会放入缓存）。Spring Boot 2.6+ 默认禁止了循环依赖。
+
+**规避方式：**
+- 用 `@Lazy` 延迟加载其中一方
+- 把公共逻辑提取到第三个 Bean 里（更推荐，从设计上消除循环）
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#七、三级缓存与循环依赖]]
+
+---
+
 ###### 10. Spring 如何处理线程安全问题？
-Spring本身不保证Bean的线程安全，需要开发者根据作用域采取不同策略：
-**singleton Bean**：需要开发者保证线程安全
+
+Spring 不保证 Bean 的线程安全，需要开发者根据 Bean 类型自己处理。
+
+**singleton Bean 的线程安全**：singleton 是单实例，多个线程共享同一个对象。如果 Bean 里有可变的实例变量，就有线程安全问题。
+
+解决思路有两种：**无状态设计**（最推荐）和 **ThreadLocal 隔离**：
+
 ```java
+// 推荐：无状态 Service，所有数据通过方法参数传入，线程安全
 @Service
-public class StatelessService { // 无状态服务，线程安全
+public class StatelessService {
     public String process(String input) {
-        return input.toUpperCase();
+        return input.toUpperCase(); // 不依赖任何实例变量
     }
 }
 
+// 必须有状态时：ThreadLocal 保证线程隔离
 @Service
-public class StatefulService {
-    private final ThreadLocal<User> userHolder = new ThreadLocal<>();
-    
-    public void setUser(User user) {
-        userHolder.set(user); // 使用ThreadLocal保持线程隔离
-    }
+public class ContextHolder {
+    private final ThreadLocal<UserContext> contextHolder = new ThreadLocal<>();
+
+    public void setContext(UserContext ctx) { contextHolder.set(ctx); }
+    public UserContext getContext() { return contextHolder.get(); }
+    public void clear() { contextHolder.remove(); } // 用完必须清理，防止内存泄漏
 }
 ```
-**prototype Bean**：每次请求新实例，天然线程安全但需注意性能
-**最佳实践**：尽量使用无状态设计，避免在singleton Bean中维护可变状态。必须维护状态时使用ThreadLocal或并发集合。
+
+**prototype Bean**：每次请求创建新实例，天然线程隔离，但频繁创建销毁有内存压力。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#三、Bean 的 6 种作用域]]
+
+---
+
 ###### 11. 什么是懒加载（Lazy Initialization）？
-**懒加载**指**延迟Bean的实例化时机**，直到第一次被请求时才创建，而非容器启动时立即创建。
-**配置方式**：
+
+懒加载就是**延迟 Bean 的实例化时机**，容器启动时不创建，第一次被用到时才创建。
+
 ```java
 @Component
-@Lazy // 类级别懒加载
+@Lazy
 public class HeavyService {
-    // 这个Bean在第一次被注入时才会实例化
+    // 启动时不会初始化，第一次注入或 getBean() 时才创建
 }
 
-@Configuration
-public class AppConfig {
-    @Bean
-    @Lazy // 方法级别懒加载
-    public ExpensiveBean expensiveBean() {
-        return new ExpensiveBean();
-    }
+// 注入懒加载 Bean 时，代理对象立即注入，但真正的 Bean 在第一次调用方法时才初始化
+@Service
+public class OrderService {
+    @Autowired
+    @Lazy
+    private HeavyService heavyService;
 }
 ```
-**XML配置**：
-```xml
-<bean id="lazyBean" class="com.example.LazyBean" lazy-init="true"/>
-```
-**应用场景**：
-- 初始化耗时的Bean
-- 不常用的功能模块
-- 测试环境快速启动
-**注意事项**：懒加载可能延迟发现配置错误，直到实际使用时才暴露问题。
+
+全局开启懒加载：`spring.main.lazy-initialization=true`。
+
+**适用场景**：初始化耗时的 Bean、不常用的功能模块、开发测试环境快速启动。
+
+**副作用**：懒加载会把配置错误延迟到第一次使用时才暴露；首次请求响应时间会变长，生产环境可以配合应用预热解决。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解#八、@Lazy 懒加载]]
+
+---
+
 ###### 12. 如何在 Spring 中注入集合类型？
-Spring支持注入多种集合类型，包括List、Set、Map和Properties。
-**集合注入示例**：
+
+Spring 支持直接注入 `List`、`Set`、`Map`、`Properties` 等集合类型。
+
 ```java
 @Component
 public class CollectionInjection {
-    // 注入同类型Bean的List，按Order排序或自然顺序
+
+    // 注入所有 Validator 类型的 Bean，按 @Order 排序
     @Autowired
     private List<Validator> validators;
-    
-    // 注入Bean的Map，key为Bean名称
+
+    // 注入所有 Processor 类型的 Bean，key 是 Bean 名称
     @Autowired
     private Map<String, Processor> processors;
-    
-    // 注入具体值集合
+
+    // 用 SpEL 注入配置值列表
     @Value("#{'${server.ports:8080,8081}'.split(',')}")
     private List<Integer> ports;
-    
-    // 注入Properties
-    @Value("#{${app.config:{key1:'value1',key2:'value2'}}}")
-    private Map<String, String> config;
 }
 ```
-**XML配置方式**：
-```xml
-<bean id="collectionBean" class="com.example.CollectionBean">
-    <property name="list">
-        <list>
-            <value>first</value>
-            <ref bean="someBean"/>
-        </list>
-    </property>
-    <property name="map">
-        <map>
-            <entry key="key1" value="value1"/>
-            <entry key="key2" value-ref="someBean"/>
-        </map>
-    </property>
-</bean>
-```
-**类型匹配规则**：当注入Bean集合时，Spring会自动收集容器中所有匹配类型的Bean。使用`@Order`注解可以控制List中Bean的顺序。
+
+当注入同类型的 Bean 集合时，Spring 会自动收集容器里所有匹配类型的 Bean。用 `@Order(1)` 或实现 `Ordered` 接口可以控制 List 里的顺序。
+
+📖 [[../../../24_SpringKnowledge/04_Bean管理与容器/01、Bean管理详解]]
