@@ -1,3 +1,16 @@
+---
+tags:
+  - MySQL/MVCC
+  - MySQL/并发控制
+  - MySQL/事务
+aliases:
+  - 多版本并发控制
+  - ReadView
+  - 事务版本链
+  - 快照读
+date: 2026-03-18
+---
+
 # MVCC 多版本并发控制
 
 > MVCC（Multi-Version Concurrency Control）是 InnoDB 实现高并发读写的核心机制，本质是**用空间换时间**——保存数据的多个历史版本，让读操作不阻塞写操作，写操作不阻塞读操作。

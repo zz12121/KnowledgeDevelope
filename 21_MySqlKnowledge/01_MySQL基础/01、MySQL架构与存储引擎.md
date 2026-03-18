@@ -1,3 +1,15 @@
+---
+tags:
+  - MySQL/基础
+  - MySQL/架构
+  - MySQL/存储引擎
+aliases:
+  - MySQL架构
+  - InnoDB
+  - 存储引擎
+date: 2026-03-18
+---
+
 # MySQL 架构与存储引擎
 
 > 理解 MySQL 的整体架构和存储引擎机制，是掌握所有高级特性的前提。本章从顶层视角建立 MySQL 的"立体模型"。

@@ -1,3 +1,16 @@
+---
+tags:
+  - MySQL/日志
+  - MySQL/RedoLog
+  - MySQL/Binlog
+aliases:
+  - Redo Log
+  - Undo Log
+  - Binlog
+  - 崩溃恢复
+date: 2026-03-18
+---
+
 # 日志系统（Redo Log / Undo Log / Binlog）
 
 > MySQL 的三大核心日志各司其职：**Redo Log** 保证崩溃恢复（持久性），**Undo Log** 支持回滚与 MVCC（原子性），**Binlog** 服务于主从复制和数据归档。三者配合，构成 InnoDB 事务可靠性的基石。

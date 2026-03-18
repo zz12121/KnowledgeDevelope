@@ -1,3 +1,15 @@
+---
+tags:
+  - MySQL/基础
+  - MySQL/SQL
+  - MySQL/执行流程
+aliases:
+  - SQL语句
+  - 查询执行流程
+  - MySQL解析器
+date: 2026-03-18
+---
+
 # SQL 语言与执行流程
 
 > 从 SQL 分类到执行原理，建立对数据库操作语言的系统性认知。

@@ -1,3 +1,16 @@
+---
+tags:
+  - MySQL/SQL优化
+  - MySQL/性能优化
+  - MySQL/慢查询
+aliases:
+  - SQL调优
+  - 分页优化
+  - 大表查询
+  - JOIN优化
+date: 2026-03-18
+---
+
 # SQL 优化实战
 
 > 把索引理论和执行计划知识落地到实际 SQL 优化场景，掌握分页、大表查询、JOIN、COUNT 等高频问题的最佳实践。
