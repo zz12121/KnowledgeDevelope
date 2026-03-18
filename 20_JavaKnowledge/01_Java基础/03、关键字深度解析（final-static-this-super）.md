@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/基础
+  - Java/关键字
+aliases:
+  - final关键字
+  - static关键字
+  - this和super
+date: 2026-03-18
+---
+
 # 关键字深度解析（final / static / this / super）
 
 > **核心关键词**：final 不可变、static 类级别、this 当前对象、super 父类、编译期常量
@@ -310,4 +321,4 @@ void method() {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/04、关键字与运算符|04、关键字与运算符]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/04、关键字与运算符|04、关键字与运算符]]

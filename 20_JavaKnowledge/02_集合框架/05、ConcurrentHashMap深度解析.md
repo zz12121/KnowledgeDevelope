@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Map
+  - Java/并发
+aliases:
+  - ConcurrentHashMap原理
+  - 分段锁
+  - 并发Map
+date: 2026-03-18
+---
+
 # ConcurrentHashMap 深度解析
 
 > **核心关键词**：分段锁（JDK7）、synchronized+CAS（JDK8）、ForwardingNode、扩容协助、并发安全
@@ -338,4 +350,4 @@ size = baseCount + sum(counterCells)
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/07、并发集合|07、并发集合]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/08、并发集合|并发-08、并发集合]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/07、并发集合|07、并发集合]] | [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/08、并发集合|并发-08、并发集合]]

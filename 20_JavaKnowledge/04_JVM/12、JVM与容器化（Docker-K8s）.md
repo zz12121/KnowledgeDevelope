@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/JVM
+  - Java/容器化
+  - Java/Docker
+aliases:
+  - JVM容器化
+  - Docker JVM
+  - K8s JVM
+date: 2026-03-18
+---
+
 # JVM 与容器化（Docker/K8s）
 
 > **核心关键词**：容器资源限制、cgroup、JVM 感知容器、堆大小自动计算、MaxRAMPercentage、就绪探针、JVM 调优
@@ -317,4 +329,4 @@ volumeMounts:
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/09、JVM 与容器化|09、JVM 与容器化]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/09、JVM 与容器化|09、JVM 与容器化]]

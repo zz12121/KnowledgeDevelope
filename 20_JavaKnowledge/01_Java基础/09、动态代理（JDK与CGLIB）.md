@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/基础
+  - Java/代理
+  - Spring/AOP
+aliases:
+  - JDK动态代理
+  - CGLIB代理
+  - InvocationHandler
+date: 2026-03-18
+---
+
 # 动态代理（JDK & CGLIB）
 
 > **核心关键词**：代理模式、JDK动态代理、CGLIB字节码增强、InvocationHandler、Spring AOP
@@ -297,4 +309,4 @@ proxy.updateStock();
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/14、代理|14、代理]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/14、代理|14、代理]]

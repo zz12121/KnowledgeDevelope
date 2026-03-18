@@ -1,4 +1,17 @@
+---
+tags:
+  - Java/并发编程
+  - Java/ThreadLocal
+aliases:
+  - ThreadLocal线程隔离
+  - InheritableThreadLocal
+  - TransmittableThreadLocal
+  - 内存泄漏
+date: 2026-03-18
+---
+
 # ThreadLocal 深度解析
+
 
 > **核心关键词**：线程本地变量、ThreadLocalMap、Entry弱引用、内存泄漏、InheritableThreadLocal、TransmittableThreadLocal
 
@@ -255,4 +268,4 @@ ttlExecutor.submit(() -> {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/10、线程通信与协作|10、线程通信与协作]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/10、线程通信与协作|10、线程通信与协作]]

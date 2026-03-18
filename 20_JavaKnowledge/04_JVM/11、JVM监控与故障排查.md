@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/JVM
+  - Java/监控
+  - Java/故障排查
+aliases:
+  - JVM监控
+  - 故障排查
+  - Arthas
+date: 2026-03-18
+---
+
 # JVM 监控与故障排查
 
 > **核心关键词**：jps、jstat、jmap、jstack、jcmd、JFR、JMC、Arthas、Prometheus、故障排查流程
@@ -284,4 +296,4 @@ Step 6：恢复 & 根因分析
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/07、性能监控与故障排查|07、性能监控与故障排查]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/07、性能监控与故障排查|07、性能监控与故障排查]]

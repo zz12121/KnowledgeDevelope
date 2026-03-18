@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/基础
+  - Java/IO
+aliases:
+  - BIO NIO AIO
+  - Selector多路复用
+  - 零拷贝
+  - epoll原理
+date: 2026-03-18
+---
+
 # IO 与 NIO 深度解析
 
 > **核心关键词**：BIO、NIO、AIO、Channel、Buffer、Selector、零拷贝、多路复用、Netty
@@ -371,4 +383,4 @@ Reactor 线程模型：
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/11、IO 流|11、IO 流]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/11、IO 流|11、IO 流]]

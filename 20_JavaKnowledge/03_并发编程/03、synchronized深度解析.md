@@ -1,4 +1,16 @@
+---
+tags:
+  - Java/并发编程
+  - Java/锁
+aliases:
+  - synchronized原理
+  - 偏向锁轻量级锁
+  - 监视器锁
+date: 2026-03-18
+---
+
 # synchronized 深度解析
+
 
 > **核心关键词**：监视器锁、对象头、偏向锁、轻量级锁、重量级锁、锁升级、可重入
 
@@ -370,4 +382,4 @@ public void processOrder(Order order) {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/02、synchronized 关键字|02、synchronized 关键字]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/02、synchronized 关键字|02、synchronized 关键字]]

@@ -1,3 +1,13 @@
+---
+tags:
+  - Java/集合框架
+  - Java/List
+aliases:
+  - ArrayList扩容
+  - 动态数组
+date: 2026-03-18
+---
+
 # ArrayList 深度解析
 
 > **核心关键词**：动态数组、扩容机制、RandomAccess、System.arraycopy、fail-fast
@@ -378,4 +388,4 @@ synchronized (syncList) {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]

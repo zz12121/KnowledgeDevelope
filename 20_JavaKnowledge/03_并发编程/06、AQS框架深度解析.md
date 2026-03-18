@@ -1,4 +1,17 @@
+---
+tags:
+  - Java/并发编程
+  - Java/锁
+aliases:
+  - AQS原理
+  - AbstractQueuedSynchronizer
+  - CLH队列
+  - 同步器框架
+date: 2026-03-18
+---
+
 # AQS 框架深度解析
+
 
 > **核心关键词**：AbstractQueuedSynchronizer、CLH队列、state、独占模式、共享模式、条件队列
 
@@ -461,4 +474,4 @@ class SimpleMutex implements Lock {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/05、AQS（AbstractQueuedSynchronizer）|05、AQS]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/05、AQS（AbstractQueuedSynchronizer）|05、AQS]] | [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]

@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/基础
+  - Java/String
+aliases:
+  - String不可变性
+  - 字符串常量池
+  - StringBuilder和StringBuffer
+date: 2026-03-18
+---
+
 # String 与字符串常量池
 
 > **核心关键词**：不可变性、字符串常量池、intern、StringBuilder、StringBuffer、编码
@@ -322,4 +333,4 @@ String result = list.stream().collect(Collectors.joining(", ", "[", "]"));
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/05、String 与常用类|05、String 与常用类]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/05、String 与常用类|05、String 与常用类]]

@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/JVM
+  - Java/调优
+  - Java/性能优化
+aliases:
+  - JVM调优
+  - GC调优
+  - OOM排查
+date: 2026-03-18
+---
+
 # JVM 调优实战
 
 > **核心关键词**：GC 日志分析、堆内存配置、GC 选型、OOM 排查、CPU 飙高、内存泄漏、jstat、jmap、Arthas
@@ -264,4 +276,4 @@ heapdump /tmp/heap.hprof             # dump 堆
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/06、JVM 调优与参数|06、JVM 调优与参数]] | [[../../10_Developlanguage/001_java/04_JavaJVMSubject/10、面试实战与案例分析|10、面试实战与案例分析]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/06、JVM 调优与参数|06、JVM 调优与参数]] | [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/10、面试实战与案例分析|10、面试实战与案例分析]]

@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/JVM
+  - Java/GC
+  - Java/ZGC
+aliases:
+  - ZGC
+  - Shenandoah
+  - 低延迟GC
+date: 2026-03-18
+---
+
 # ZGC 与 Shenandoah
 
 > **核心关键词**：低延迟 GC、着色指针、读屏障、并发整理、停顿 < 10ms、可伸缩、染色指针
@@ -227,4 +239,4 @@ JDK 21+ 新项目 → 考虑分代 ZGC（-XX:+UseZGC -XX:+ZGenerational）
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/05、新一代垃圾收集器|05、新一代垃圾收集器]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/05、新一代垃圾收集器|05、新一代垃圾收集器]]

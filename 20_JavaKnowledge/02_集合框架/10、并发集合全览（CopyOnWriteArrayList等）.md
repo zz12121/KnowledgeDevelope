@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/集合框架
+  - Java/并发
+aliases:
+  - CopyOnWriteArrayList
+  - ConcurrentLinkedQueue
+  - BlockingQueue
+  - 并发安全集合
+date: 2026-03-18
+---
+
 # 并发集合全览
 
 > **核心关键词**：CopyOnWriteArrayList、ConcurrentLinkedQueue、BlockingQueue、ConcurrentSkipListMap、Collections.synchronizedXxx
@@ -308,4 +320,4 @@ synchronized (syncList) {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/07、并发集合|02集合-07、并发集合]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/08、并发集合|并发-08、并发集合]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/07、并发集合|02集合-07、并发集合]] | [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/08、并发集合|并发-08、并发集合]]

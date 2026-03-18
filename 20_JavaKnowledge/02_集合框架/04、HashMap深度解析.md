@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Map
+aliases:
+  - HashMap原理
+  - 哈希表
+  - 红黑树转换
+  - 扰动函数
+date: 2026-03-18
+---
+
 # HashMap 深度解析
 
 > **核心关键词**：哈希表、拉链法、红黑树、扰动函数、扩容、负载因子、线程不安全
@@ -392,4 +404,4 @@ map.entrySet().removeIf(e -> e.getValue() < 0);
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]

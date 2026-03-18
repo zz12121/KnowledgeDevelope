@@ -1,4 +1,17 @@
+---
+tags:
+  - Java/并发编程
+  - Java/锁
+aliases:
+  - ReentrantLock可重入锁
+  - ReadWriteLock
+  - StampedLock
+  - 公平锁非公平锁
+date: 2026-03-18
+---
+
 # ReentrantLock 与读写锁
+
 
 > **核心关键词**：ReentrantLock、公平锁、非公平锁、Condition、ReadWriteLock、StampedLock、锁降级、锁超时
 
@@ -514,4 +527,4 @@ public boolean transfer(Account from, Account to, double amount) {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]

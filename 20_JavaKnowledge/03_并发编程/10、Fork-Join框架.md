@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/并发编程
+  - Java/Fork-Join
+aliases:
+  - ForkJoinPool
+  - 工作窃取算法
+  - RecursiveTask
+  - 分治并行
+date: 2026-03-18
+---
+
 # 10、Fork-Join 框架
 
 > **核心思想**：分治 + 工作窃取（Work-Stealing），将大任务拆分为小任务并行执行，空闲线程主动从其他线程队列尾部窃取任务。
@@ -311,4 +323,4 @@ task.join();  // 直接抛出原始异常（RuntimeException/Error）
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Map
+aliases:
+  - TreeMap有序Map
+  - 红黑树原理
+  - NavigableMap
+date: 2026-03-18
+---
+
 # TreeMap 与红黑树
 
 > **核心关键词**：红黑树、有序Map、NavigableMap、floor/ceiling/subMap、compareTo
@@ -348,4 +359,4 @@ Map.Entry<Long, String> route = routeTable.floorEntry(targetIP);
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/06、比较器与排序|06、比较器与排序]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]] | [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/06、比较器与排序|06、比较器与排序]]

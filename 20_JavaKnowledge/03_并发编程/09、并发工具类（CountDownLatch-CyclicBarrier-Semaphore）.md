@@ -1,4 +1,17 @@
+---
+tags:
+  - Java/并发编程
+  - Java/并发工具
+aliases:
+  - CountDownLatch倒计时
+  - CyclicBarrier循环屏障
+  - Semaphore信号量
+  - Exchanger
+date: 2026-03-18
+---
+
 # 并发工具类（CountDownLatch / CyclicBarrier / Semaphore）
+
 
 > **核心关键词**：倒计时门闩、循环屏障、信号量、线程协调、AQS共享模式
 
@@ -259,4 +272,4 @@ String data = exchanger.exchange("数据from B");
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

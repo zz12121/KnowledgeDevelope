@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/JVM
+aliases:
+  - JVM架构
+  - 运行时数据区
+  - 执行引擎
+  - JIT编译器
+date: 2026-03-18
+---
+
 # JVM 整体架构
 
 > **核心关键词**：类加载子系统、运行时数据区、执行引擎、本地方法接口、GC
@@ -304,4 +315,4 @@ ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024);
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/04_JavaJVMSubject/01、JVM 基础概念|01、JVM 基础概念]] | [[../../10_Developlanguage/001_java/01_JavaBaseSubject/01、Java 语言基础|基础-01、Java 语言基础]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/01、JVM 基础概念|01、JVM 基础概念]] | [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/01、Java 语言基础|基础-01、Java 语言基础]]

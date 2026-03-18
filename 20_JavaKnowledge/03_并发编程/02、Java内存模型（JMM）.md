@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/并发编程
+  - Java/JMM
+aliases:
+  - Java内存模型
+  - happens-before
+  - 内存可见性
+  - 指令重排序
+date: 2026-03-18
+---
+
 # Java 内存模型（JMM）
 
 > **核心关键词**：主内存、工作内存、happens-before、可见性、有序性、原子性
@@ -316,4 +328,4 @@ public void run() {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/11、内存模型与可见性|11、内存模型与可见性]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/11、内存模型与可见性|11、内存模型与可见性]]

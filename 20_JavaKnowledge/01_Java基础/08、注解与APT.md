@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/基础
+  - Java/注解
+aliases:
+  - Annotation
+  - APT注解处理器
+  - Lombok原理
+date: 2026-03-18
+---
+
 # 注解与 APT
 
 > **核心关键词**：@interface、元注解、RetentionPolicy、ElementType、注解处理器、APT、编译期代码生成
@@ -290,4 +301,4 @@ public class OrderService {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/13、注解|13、注解]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/13、注解|13、注解]]

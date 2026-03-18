@@ -1,3 +1,15 @@
+---
+tags:
+  - Java/基础
+  - Java/SPI
+aliases:
+  - ServiceLoader
+  - Spring SPI
+  - Dubbo SPI
+  - 服务发现
+date: 2026-03-18
+---
+
 # SPI 机制
 
 > **核心关键词**：Service Provider Interface、ServiceLoader、META-INF/services、Java SPI vs Spring SPI vs Dubbo SPI、扩展点
@@ -230,4 +242,4 @@ SPI（Service Provider Interface）：
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/01_JavaBaseSubject/15、SPI 机制|15、SPI 机制]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/01_JavaBaseSubject/15、SPI 机制|15、SPI 机制]]

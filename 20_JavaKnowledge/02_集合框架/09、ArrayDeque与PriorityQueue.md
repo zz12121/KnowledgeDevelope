@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Queue
+aliases:
+  - 双端队列
+  - 优先级队列
+  - 最小堆最大堆
+date: 2026-03-18
+---
+
 # ArrayDeque 与 PriorityQueue
 
 > **核心关键词**：双端队列、栈、队列、堆、优先级队列、最大堆、最小堆、Deque、offer/poll/peek
@@ -271,4 +282,4 @@ public int[] maxSlidingWindow(int[] nums, int k) {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/05、Queue 相关|05、Queue 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/05、Queue 相关|05、Queue 相关]]

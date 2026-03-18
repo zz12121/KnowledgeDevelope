@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Map
+aliases:
+  - LinkedHashMap
+  - LRU缓存实现
+  - 访问顺序
+date: 2026-03-18
+---
+
 # LinkedHashMap 与 LRU 缓存
 
 > **核心关键词**：插入顺序、访问顺序、双向链表、LRU、removeEldestEntry
@@ -333,4 +344,4 @@ public class TwoLevelCache<K, V> {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]

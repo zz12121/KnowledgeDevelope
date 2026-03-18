@@ -1,4 +1,17 @@
+---
+tags:
+  - Java/并发编程
+  - Java/原子类
+aliases:
+  - CAS原理
+  - AtomicInteger
+  - LongAdder
+  - ABA问题
+date: 2026-03-18
+---
+
 # CAS 与原子类
+
 
 > **核心关键词**：Compare-And-Swap、Unsafe、AtomicInteger、LongAdder、ABA问题、CAS自旋
 
@@ -356,4 +369,4 @@ sum() = base + Σ cells[i].value
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/09、原子类|09、原子类]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/09、原子类|09、原子类]]

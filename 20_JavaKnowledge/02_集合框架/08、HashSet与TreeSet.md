@@ -1,3 +1,14 @@
+---
+tags:
+  - Java/集合框架
+  - Java/Set
+aliases:
+  - HashSet原理
+  - TreeSet有序集合
+  - Set去重
+date: 2026-03-18
+---
+
 # HashSet 与 TreeSet
 
 > **核心关键词**：HashSet、LinkedHashSet、TreeSet、去重原理、有序性、equals/hashCode、Comparable/Comparator
@@ -231,4 +242,4 @@ System.out.println(primes.subSet(5, 15));  // [5, 7, 11, 13]
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/03、Set 相关|03、Set 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/03、Set 相关|03、Set 相关]]

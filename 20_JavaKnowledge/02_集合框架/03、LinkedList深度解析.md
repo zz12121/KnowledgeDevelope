@@ -1,3 +1,13 @@
+---
+tags:
+  - Java/集合框架
+  - Java/List
+aliases:
+  - LinkedList双向链表
+  - Deque实现
+date: 2026-03-18
+---
+
 # LinkedList 深度解析
 
 > **核心关键词**：双向链表、Deque、头尾操作、内存结构、与 ArrayList 对比
@@ -341,4 +351,4 @@ void redo() {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/02、List 相关|02、List 相关]]

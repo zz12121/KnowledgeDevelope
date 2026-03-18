@@ -1,4 +1,16 @@
+---
+tags:
+  - Java/并发编程
+  - Java/关键字
+aliases:
+  - volatile可见性
+  - 内存屏障
+  - 禁止重排序
+date: 2026-03-18
+---
+
 # volatile 深度解析
+
 
 > **核心关键词**：可见性、有序性、内存屏障、happens-before、不保证原子性、DCL、CPU缓存行、MESI协议
 
@@ -328,4 +340,4 @@ class ContendedLong {
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/03、volatile 关键字|03、volatile 关键字]] | [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/11、内存模型与可见性|11、内存模型与可见性]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/03、volatile 关键字|03、volatile 关键字]] | [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/11、内存模型与可见性|11、内存模型与可见性]]

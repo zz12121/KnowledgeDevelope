@@ -1,4 +1,17 @@
-# 11、CompletableFuture 异步编程
+---
+tags:
+  - Java/并发编程
+  - Java/异步编程
+aliases:
+  - CompletableFuture
+  - 异步编排
+  - thenApply thenCompose
+  - 异步回调
+date: 2026-03-18
+---
+
+# CompletableFuture 异步编程
+
 
 > **定位**：JDK8 引入，实现 `Future` + `CompletionStage` 接口，支持链式异步编程、函数式组合、异常处理，是 Java 异步编排的核心工具。
 
@@ -339,4 +352,4 @@ CompletableFuture 内部维护：
 
 ---
 
-**相关面试题** → [[../../10_Developlanguage/001_java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]
+**相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]
