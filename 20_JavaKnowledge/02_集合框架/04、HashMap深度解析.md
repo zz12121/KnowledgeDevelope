@@ -112,22 +112,22 @@ XOR结果：       0100 0100 0100 1100  = 0x444C
 ```mermaid
 flowchart TD
     A[put key, value] --> B[计算 hash key]
-    B --> C{table 是否为空?}
+    B --> C{"table 是否为空?"}
     C -->|是| D[resize 初始化]
-    D --> E[计算桶索引 i = n-1 & hash]
+    D --> E["计算桶索引 i = (n-1) & hash"]
     C -->|否| E
-    E --> F{table[i] 是否为 null?}
+    E --> F{"table[i] 是否为 null?"}
     F -->|是| G[直接放入新 Node]
-    F -->|否| H{头节点 key 是否相同?}
+    F -->|否| H{"头节点 key 是否相同?"}
     H -->|是| I[覆盖 value]
-    H -->|否| J{头节点是否是 TreeNode?}
+    H -->|否| J{"头节点是否是 TreeNode?"}
     J -->|是| K[调用红黑树 putTreeVal]
     J -->|否| L[遍历链表]
-    L --> M{找到相同 key?}
+    L --> M{"找到相同 key?"}
     M -->|是| N[覆盖 value]
     M -->|否| O[尾部插入新 Node]
-    O --> P{链表长度 >= 8?}
-    P -->|是| Q{数组容量 >= 64?}
+    O --> P{"链表长度 >= 8?"}
+    P -->|是| Q{"数组容量 >= 64?"}
     Q -->|是| R[treeifyBin 转红黑树]
     Q -->|否| S[resize 扩容]
     P -->|否| T[检查是否需要扩容]
@@ -137,7 +137,7 @@ flowchart TD
     N --> T
     R --> T
     S --> T
-    T --> U{size > threshold?}
+    T --> U{"size > threshold?"}
     U -->|是| V[resize 扩容]
     U -->|否| W[结束]
     V --> W

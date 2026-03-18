@@ -240,12 +240,13 @@ public class ThreadSafeLRUCache<K, V> {
 
 ```mermaid
 flowchart LR
-    subgraph LRU[LRU Cache容量=3]
+    subgraph LRU["LRU Cache 容量=3 初始状态"]
         direction LR
-        H[HEAD<br/>最久未用] <-->|prev/next| A[key=1] <-->|prev/next| B[key=2] <-->|prev/next| T[TAIL<br/>最近使用]
+        H["HEAD 最久未用"] --> A["key=1"] --> B["key=2"] --> T["TAIL 最近使用"]
+        T --> B --> A --> H
     end
 
-    GET1[get key=1] -->|移到尾部| H2[HEAD<br/>最久未用] <-->|prev/next| B2[key=2] <-->|prev/next| A2[key=1] <-->|prev/next| T2[TAIL<br/>最近使用]
+    GET1["get key=1 移到尾部"] --> H2["HEAD 最久未用"] --> B2["key=2"] --> A2["key=1"] --> T2["TAIL 最近使用"]
 ```
 
 ---

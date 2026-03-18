@@ -7,7 +7,8 @@ flowchart TD
     B --> F[LinkedHashSet]
     B --> G["底层基于 HashMap"]
     F --> H["底层基于 LinkedHashMap"]
-    C --> I["底层基于 TreeMap（红黑树）"]
+    C --> I["底层基于 TreeMap(红黑树)"]
+
 ```
 
 ###### 1. HashSet 的实现原理是什么？

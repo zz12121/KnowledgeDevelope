@@ -93,13 +93,13 @@ private static int calculateCapacity(Object[] elementData, int minCapacity) {
 
 ```mermaid
 flowchart TD
-    A[add element] --> B{size >= elementData.length?}
+    A[add element] --> B{"size >= elementData.length?"}
     B -->|否| C[直接写入 elementData[size++]]
     B -->|是| D[grow 扩容]
     D --> E[新容量 = 旧容量 * 1.5]
-    E --> F{新容量 < minCapacity?}
+    E --> F{"新容量 < minCapacity?"}
     F -->|是| G[新容量 = minCapacity]
-    F -->|否| H{新容量 > MAX_ARRAY_SIZE?}
+    F -->|否| H{"新容量 > MAX_ARRAY_SIZE?"}
     H -->|是| I[hugeCapacity 处理]
     H -->|否| J[Arrays.copyOf 复制数组]
     G --> J

@@ -122,25 +122,25 @@ static final class ForwardingNode<K,V> extends Node<K,V> {
 ```mermaid
 flowchart TD
     A[put key,value] --> B[计算 hash key 扰动处理]
-    B --> C{table 是否为空?}
+    B --> C{"table 是否为空?"}
     C -->|是| D[initTable CAS 初始化]
-    D --> E[计算桶索引 i = n-1 & hash]
+    D --> E["计算桶索引 i = (n-1) & hash"]
     C -->|否| E
-    E --> F{table[i] 是否为 null?}
+    E --> F{"table[i] 是否为 null?"}
     F -->|是| G[CAS 直接写入新 Node 无锁]
-    F -->|否| H{hash == MOVED?}
+    F -->|否| H{"hash == MOVED?"}
     H -->|是| I[helpTransfer 协助扩容]
     I --> E
-    H -->|否| J[synchronized table[i] 加锁]
-    J --> K{是链表节点?}
+    H -->|否| J["synchronized(table[i]) 加锁"]
+    J --> K{"是链表节点?"}
     K -->|是| L[遍历链表 查找或尾插]
-    K -->|否| M[是TreeBin? 走红黑树插入]
-    L --> N{链表长度 >= 8?}
+    K -->|否| M[是TreeBin 走红黑树插入]
+    L --> N{"链表长度 >= 8?"}
     N -->|是| O[treeifyBin 树化]
     G --> P[addCount +1 检查扩容]
     O --> P
     M --> P
-    P --> Q{需要扩容?}
+    P --> Q{"需要扩容?"}
     Q -->|是| R[transfer 扩容迁移]
     Q -->|否| S[完成]
     R --> S
