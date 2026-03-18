@@ -258,7 +258,187 @@ String data = exchanger.exchange("数据from B");
 
 ---
 
-## 五、面试要点速查
+## 五、三大工具类对比与选型
+
+### 5.1 核心区别一览
+
+| 特性 | CountDownLatch | CyclicBarrier | Semaphore |
+|------|----------------|---------------|-----------|
+| **核心语义** | 等待事件完成 | 等待线程集合 | 控制访问数量 |
+| **等待方** | 一个或多个线程等待 | 所有参与线程互相等待 | 获取许可证的线程 |
+| **触发条件** | 计数器减到 0 | 到达线程数达到阈值 | 有可用许可证 |
+| **可重用性** | ❌ 一次性 | ✅ 可循环使用 | ✅ 许可证可释放复用 |
+| **典型场景** | 主线程等待子任务完成 | 多线程分阶段协作 | 限流、资源池 |
+| **AQS 模式** | 共享模式 | 独占/共享模式 | 共享模式 |
+
+### 5.2 选型决策树
+
+```
+需要协调多个线程的执行顺序？
+    ├── 是 → 需要等待其他线程完成某个事件？
+    │           ├── 是 → CountDownLatch（一次性等待）
+    │           └── 否 → CyclicBarrier（多线程互相等待，可循环）
+    └── 否 → 需要限制并发访问数量？
+                ├── 是 → Semaphore（限流、资源池）
+                └── 否 → 考虑其他工具（Lock、Condition、BlockingQueue）
+```
+
+---
+
+## 六、实战场景详解
+
+### 6.1 多阶段任务协调（CyclicBarrier）
+
+```java
+// 模拟分布式计算：分片处理 → 汇总结果 → 下一阶段
+public class MultiPhaseComputation {
+    private static final int SHARD_COUNT = 4;
+    
+    public static void main(String[] args) {
+        // 第一阶段屏障：所有分片完成本地计算
+        CyclicBarrier phase1Barrier = new CyclicBarrier(SHARD_COUNT, () -> {
+            System.out.println("所有分片完成本地计算，开始汇总...");
+        });
+        
+        // 第二阶段屏障：汇总完成，开始全局优化
+        CyclicBarrier phase2Barrier = new CyclicBarrier(SHARD_COUNT, () -> {
+            System.out.println("全局优化完成，输出最终结果...");
+        });
+        
+        ExecutorService executor = Executors.newFixedThreadPool(SHARD_COUNT);
+        
+        for (int i = 0; i < SHARD_COUNT; i++) {
+            final int shardId = i;
+            executor.submit(() -> {
+                try {
+                    // 阶段1：本地计算
+                    System.out.println("分片 " + shardId + " 开始本地计算");
+                    Thread.sleep(RandomUtil.randomInt(100, 500));
+                    phase1Barrier.await();  // 等待其他分片
+                    
+                    // 阶段2：全局优化
+                    System.out.println("分片 " + shardId + " 参与全局优化");
+                    Thread.sleep(RandomUtil.randomInt(100, 300));
+                    phase2Barrier.await();
+                    
+                    System.out.println("分片 " + shardId + " 完成全部任务");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+        
+        executor.shutdown();
+    }
+}
+```
+
+### 6.2 服务启动依赖管理（CountDownLatch）
+
+```java
+// 微服务启动：等待所有依赖服务就绪后才对外提供服务
+public class ServiceStartupManager {
+    private static final List<String> DEPENDENCIES = Arrays.asList(
+        "database", "redis", "kafka", "config-server"
+    );
+    
+    public static void main(String[] args) throws InterruptedException {
+        CountDownLatch readyLatch = new CountDownLatch(DEPENDENCIES.size());
+        ExecutorService executor = Executors.newFixedThreadPool(DEPENDENCIES.size());
+        
+        for (String dep : DEPENDENCIES) {
+            executor.submit(() -> {
+                try {
+                    System.out.println("正在初始化: " + dep);
+                    checkHealth(dep);  // 检查服务健康状态
+                    System.out.println(dep + " 就绪 ✓");
+                } finally {
+                    readyLatch.countDown();
+                }
+            });
+        }
+        
+        // 主线程等待所有依赖就绪
+        readyLatch.await();
+        System.out.println("所有依赖就绪，服务开始对外提供服务...");
+        
+        // 启动 HTTP 服务...
+        startHttpServer();
+        executor.shutdown();
+    }
+    
+    private static void checkHealth(String service) throws InterruptedException {
+        // 模拟健康检查
+        Thread.sleep(RandomUtil.randomInt(500, 2000));
+    }
+}
+```
+
+### 6.3 数据库连接池实现（Semaphore）
+
+```java
+// 简化的数据库连接池
+public class SimpleConnectionPool {
+    private final Semaphore permits;
+    private final BlockingQueue<Connection> pool;
+    private final int maxConnections;
+    
+    public SimpleConnectionPool(int maxConnections) throws SQLException {
+        this.maxConnections = maxConnections;
+        this.permits = new Semaphore(maxConnections);
+        this.pool = new LinkedBlockingQueue<>(maxConnections);
+        
+        // 初始化连接
+        for (int i = 0; i < maxConnections; i++) {
+            pool.add(createNewConnection());
+        }
+    }
+    
+    public Connection acquireConnection(long timeout, TimeUnit unit) 
+            throws InterruptedException, SQLException {
+        // 获取许可证（限流）
+        if (!permits.tryAcquire(timeout, unit)) {
+            throw new SQLException("获取连接超时，当前活跃连接数: " + 
+                (maxConnections - permits.availablePermits()));
+        }
+        
+        Connection conn = pool.poll();
+        if (conn == null || conn.isClosed()) {
+            conn = createNewConnection();
+        }
+        
+        return new PooledConnection(conn, this);
+    }
+    
+    void releaseConnection(Connection conn) {
+        if (conn != null) {
+            pool.offer(conn);
+            permits.release();  // 释放许可证
+        }
+    }
+    
+    public int getActiveConnections() {
+        return maxConnections - permits.availablePermits();
+    }
+}
+
+// 包装类，确保连接归还
+class PooledConnection implements Connection {
+    private final Connection realConnection;
+    private final SimpleConnectionPool pool;
+    
+    @Override
+    public void close() throws SQLException {
+        pool.releaseConnection(realConnection);  // 归还到连接池
+    }
+    
+    // 其他方法委托给 realConnection...
+}
+```
+
+---
+
+## 七、面试要点速查
 
 | 问题 | 要点 |
 |------|------|
@@ -268,6 +448,27 @@ String data = exchanger.exchange("数据from B");
 | CountDownLatch 和 CyclicBarrier 的区别 | CDL 等事件（一次性）；CB 等线程互相到达（可循环），CB 可有屏障动作 |
 | Semaphore 是公平的吗 | 默认非公平，可以通过构造器参数设为公平 |
 | Semaphore 释放许可证的注意事项 | 必须在 finally 中 release，防止异常导致许可证泄漏永远无法获取 |
+| CyclicBarrier 的 broken 状态 | 如果线程在 await() 时被中断或超时，屏障会被打破，其他线程抛出 BrokenBarrierException |
+| CountDownLatch 的计数器能重置吗 | 不能，一次性使用。需要重置的场景用 CyclicBarrier 或 Phaser |
+| Semaphore 的 acquire() 和 tryAcquire() 区别 | acquire() 阻塞等待；tryAcquire() 立即返回布尔值，可设置超时 |
+| 三个类底层实现 | 都基于 AQS（AbstractQueuedSynchronizer），Semaphore 和 CountDownLatch 使用共享模式 |
+
+### 进阶面试题
+
+**Q：CountDownLatch 的计数器为什么不能重置？**
+> CountDownLatch 设计为一次性使用的同步器。如果需要可重置的计数功能，应该使用 CyclicBarrier（线程间互相等待）或 Java 7 引入的 Phaser（更灵活的分阶段同步器）。CountDownLatch 的简单性保证了更高的性能和更明确的语义。
+
+**Q：CyclicBarrier 和 CountDownLatch 在 AQS 实现上有什么区别？**
+> - CountDownLatch：使用 AQS 的共享模式，countDown() 释放共享锁，await() 获取共享锁
+> - CyclicBarrier：基于 ReentrantLock 和 Condition 实现，不是直接使用 AQS。每次屏障触发后会重置 generation，实现循环使用
+
+**Q：Semaphore 的公平和非公平模式性能差异有多大？**
+> 非公平模式性能通常比公平模式高 10~100 倍。公平模式需要维护 FIFO 队列，每次获取都要检查是否有等待时间更长的线程。只有在确实需要避免线程饥饿时才使用公平模式。
+
+**Q：实际项目中如何选择这三个工具类？**
+> - **CountDownLatch**：服务启动等待、并行计算结果汇总、超时控制
+> - **CyclicBarrier**：多线程分阶段计算、并行迭代算法（如 PageRank）、测试并发场景
+> - **Semaphore**：API 限流、数据库连接池、资源访问控制、并发度控制
 
 
 ---
