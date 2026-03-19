@@ -404,4 +404,99 @@ map.entrySet().removeIf(e -> e.getValue() < 0);
 
 ---
 
+## 📚 PDF补充：HashMap 源码深度解析
+
+### 补充一：扰动函数 hash() 详解
+
+> HashMap 的 `hash()` 方法也称为扰动函数，其目的是让高位也能参与桶索引的计算，减少哈希碰撞。
+
+```java
+static final int hash(Object key) {
+    int h;
+    // JDK 8：h = key.hashCode() ^ (h >>> 16)
+    // 高16位与低16位进行异或，让高位参与到寻址中来
+    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+}
+```
+
+**为什么需要扰动？**
+
+```
+假设 table 长度 n = 16 (二进制 10000)
+- 1 位掩码 (n-1) = 15 (二进制 01111)
+
+如果不用扰动函数：
+- key1.hashCode() = 0x12345678
+  0x12345678 & 0xFFFF = 0x5678 (只用到了低16位)
+  
+- key2.hashCode() = 0x12340000  
+  0x12340000 & 0xFFFF = 0x5678 (同样的索引！冲突！)
+
+使用扰动后：
+- key1: 0x12345678 ^ (0x12345678 >>> 16) = 0x12345678 ^ 0x1234
+- key2: 0x12340000 ^ (0x12340000 >>> 16) = 0x12340000 ^ 0x1234
+  
+结果不同！减少了碰撞！
+```
+
+### 补充二：JDK 7 头插法的问题 vs JDK 8 尾插法
+
+> **JDK 7 使用头插法**，在并发扩容时会导致环形链表，造成死循环。**JDK 8 改用尾插法**解决了这个问题。
+
+**头插法导致死循环的原因：**
+
+```
+假设原链表：A → B → null
+头插法扩容后（线程A和线程B同时执行）：
+
+线程A执行到一半被挂起：
+- e = A, next = B
+- 线程B完成扩容：e = B, next = A, 新链表：B → A → null
+- 线程A恢复：e = A, next = B，但 B 已经指向 A 了！
+- 结果：形成环形链表 A → B → A → ...
+
+当有线程调用 get() 遍历时：
+- 遍历到死循环位置就会 CPU 100%
+```
+
+**尾插法为什么安全？**
+
+```
+JDK 8 尾插法：
+- 遍历链表，保持原顺序
+- 用 loHead/loTail 链接低位链
+- 用 hiHead/hiTail 链接高位链
+- 最后将两条链接到新 table
+
+结果：新链表顺序与原链表一致，不会形成环形结构
+```
+
+### 补充三：putVal 方法的四大步骤
+
+根据 PDF 源码解析，`putVal` 方法完整执行以下 4 个步骤：
+
+```java
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
+    // 步骤1：创建 table 数组（首次 put 时触发）
+    if ((p = tab[i = (n - 1) & hash]) == null)
+        tab[i] = newNode(hash, key, value, null);
+    
+    // 步骤2：没有发生哈希冲突，直接插入
+    else {
+        // ...
+    }
+    
+    // 步骤3：发生了哈希冲突
+    // 3.1 key 相同 -> 覆盖
+    // 3.2 红黑树插入
+    // 3.3 链表插入 (JDK8 尾插法)
+    
+    // 步骤4：超过阈值则扩容
+    if (++size > threshold)
+        resize();
+}
+```
+
+---
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/02_JavaCollectionSubject/04、Map 相关|04、Map 相关]]
