@@ -276,4 +276,67 @@ heapdump /tmp/heap.hprof             # dump 堆
 
 ---
 
+## 附录：PDF补充 JVM 常用参数
+
+### 内存参数
+
+| 参数 | 说明 |
+|------|------|
+| `-Xms128m` | 设置初始化堆内存为128M |
+| `-Xmx512m` | 设置最大堆内存为512M |
+| `-Xmn160m` | 设置新生代大小为-Xmn160M（堆空间1/4~1/3） |
+| `-Xss128m` | 设置最大栈内存为128M |
+| `-XX:SurvivorRatio` | 设置新生代eden区与from/to空间的比例关系 |
+| `-XX:PermSize=64M` | 设置初始永久区64M（JDK8之前） |
+| `-XX:MaxPermSize=128M` | 设置最大永久区128M（JDK8之前） |
+| `-XX:MaxMetaspaceSize` | 设置元数据区大小（JDK1.8 取代永久区） |
+
+### 逃逸分析参数
+
+| 参数 | 说明 |
+|------|------|
+| `-XX:+DoEscapeAnalysis` | 启用逃逸分析（Server模式） |
+| `-XX:+EliminateAllocations` | 开启标量替换（默认开启） |
+
+### 类加载参数
+
+| 参数 | 说明 |
+|------|------|
+| `-XX:+TraceClassLoading` | 跟踪类的加载 |
+| `-XX:+TraceClassUnloading` | 跟踪类的卸载 |
+
+### GC日志参数
+
+| 参数 | 说明 |
+|------|------|
+| `-Xloggc:gc.log` | 将gc日志信息打印到gc.log文件中 |
+| `-XX:+PrintGC` | 打印GC日志 |
+| `-XX:+PrintGCDetails` | 打印GC详细日志 |
+| `-XX:+PrintGCTimeStamps` | 输出GC发生的时间 |
+| `-XX:+PrintGCApplicationStoppedTime` | GC产生停顿的时间 |
+| `-XX:+PrintGCApplicationConcurrentTime` | 应用执行的时间 |
+| `-XX:+PrintHeapAtGC` | 在GC发生前后，打印堆栈日志 |
+| `-XX:+PrintReferenceGC` | 打印对象引用信息 |
+
+### TLAB参数
+
+| 参数 | 说明 |
+|------|------|
+| `-XX:+PrintTLAB` | 打印TLAB相关分配信息 |
+| `-XX:+UseTLAB` | 打开TLAB |
+| `-XX:TLABSize` | 设置TLAB大小 |
+| `-XX:+ResizeTLAB` | 自动调整TLAB大小 |
+
+### 其他参数
+
+| 参数 | 说明 |
+|------|------|
+| `-XX:+PrintVMOptions` | 打印虚拟机参数 |
+| `-XX:+PrintCommandLineFlags` | 打印虚拟机显式和隐式参数 |
+| `-XX:+PrintFlagsFinal` | 打印所有系统参数 |
+| `-XX:+DisableExplicitGC` | 禁用显示GC（System.gc()） |
+| `-XX:+ExplicitGCInvokesConcurrent` | 使用并发方式处理显式GC |
+
+---
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/06、JVM 调优与参数|06、JVM 调优与参数]] | [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/10、面试实战与案例分析|10、面试实战与案例分析]]

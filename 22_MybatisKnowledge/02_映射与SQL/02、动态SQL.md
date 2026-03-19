@@ -94,4 +94,54 @@ INSERT INTO users (name, age) VALUES
 
 ---
 
+## 四、补充：concat 与 bind 的使用
+
+### concat 方式（SQL函数拼接）
+
+```xml
+<select id="getUserByName" parameterType="string" resultMap="userResultMap">
+    select id, name, age from tb_user
+    where name like concat('%', #{name}, '%')
+</select>
+```
+
+### bind 方式（推荐，更清晰）
+
+```xml
+<select id="getUserByName" parameterType="string" resultMap="userResultMap">
+    <bind name="namePattern" value="'%' + name + '%'"/>
+    select id, name, age from tb_user
+    where name like #{namePattern}
+</select>
+```
+
+> `bind` 标签可以将 OGNL 表达式的结果绑定到一个变量上，方便后续引用。
+
+---
+
+## 五、SQL 注入详解
+
+### 什么是 SQL 注入？
+
+SQL 注入是指 Web 应用程序对用户输入数据的合法性没有判断或过滤不严，攻击者可以在 Web 应用程序中事先定义好的查询语句的结尾上添加额外的 SQL 语句，在管理员不知情的情况下实现非法操作。
+
+### #{} vs ${} 的安全对比
+
+| 特性 | #{} | ${} |
+|------|-----|-----|
+| 处理方式 | 预编译，用占位符 `?` 替代 | 字符串直接替换 |
+| SQL 注入 | **安全** | **危险** |
+| 性能 | 高（预编译一次，多次执行）| 低（每次都解析）|
+| 场景 | 绝大多数场景 | 动态传入表名、字段名、排序关键字 |
+
+```sql
+-- #{} 预编译后的形式
+SELECT * FROM user WHERE name = ?  -- 参数被当作纯数据
+
+-- ${} 字符串替换后的形式  
+SELECT * FROM user WHERE name = 'muse'  -- 直接拼接，可能被注入
+```
+
+---
+
 **相关面试题** → [[../../../10_DevelopLanguage/003_ORM/01_MyBatisSubject/03、映射文件与 SQL|映射文件与 SQL 面试题]]

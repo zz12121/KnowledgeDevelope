@@ -296,4 +296,140 @@ Step 6：恢复 & 根因分析
 
 ---
 
+## 附录：PDF补充 Linux与JDK监控工具
+
+### Linux 监控命令
+
+#### top 命令
+
+能够实时显示系统中各个进程的资源占用情况。分为两部分：系统统计信息&进程信息。
+
+**系统统计信息**：
+- Line1:任务队列信息，从左到右依次表示：系统当前时间、系统运行时间、当前登录用户数。Load average表示系统的平均负载，即任务队列的平均长度——1分钟、5分钟、15分钟到现在的平均值
+- Line2:进程统计信息，分别是：正在运行进程数、睡眠进程数、停止的进程数、僵尸进程数
+- Line3:CPU统计信息。us表示用户空间CPU占用率、sy表示内核空间CPU占用率、ni表示用户进程空间改变过优先级的进程CPU占用率。id表示空闲CPU占用率、wa表示待输入输出的CPU时间百分比、hi表示硬件中断请求、si表示软件中断请求
+- Line4:内存统计信息。从左到右依次表示：物理内存总量、已使用的物理内存、空闲物理内存、内核缓冲使用量
+- Line5:从左到右表示：交换区总量、已使用交换区大小、空闲交换区大小、缓冲交换区大小
+
+**进程信息**：
+- PID：进程id
+- USER：进程所有者
+- PR：优先级
+- NI：nice值，负值→高优先级，正值→低优先级
+- VIRT：进程使用虚拟内存总量 VIRT=SWAP+RES
+- RES：进程使用并未被换出的内存。CODE+DATA
+- SHR：共享内存大小
+- S：进程状态。D=不可中断的睡眠状态 R=运行 S=睡眠 T=跟踪/停止 Z=僵尸进程
+- %CPU：上次更新到现在的CPU时间占用百分比
+- %MEM：进程使用的物理内存百分比
+- TIME+：进程使用的CPU时间总计，单位1/100秒
+- COMMAND：命令行
+
+#### vmstat 命令
+
+性能监测工具，显示单位均为kb。它可以统计CPU、内存使用情况、swap使用情况等信息，也可以指定采样周期和采用次数。例如：`vmstat 1 3`
+
+- procs列：r表示等待运行的进程数。b表示处于非中断睡眠状态的进程数
+- memory列：swpd表示虚拟内存使用情况。free表示空闲内存量。buff表示被用来作为缓存的内存
+- swap列：si表示从磁盘交换到内存的交换页数量。so表示从内存交换到磁盘的交换页数量
+- io列：bi表示发送到块设备的块数，单位：块/秒。bo表示从块设备接收到的块数
+- system列：in表示每秒的中断数，包括时钟中断。cs表示每秒的上下文切换次数
+- cpu列：us表示用户cpu使用时间。sy表示内核cpu系统使用时间。id表示空闲时间。wa表示等待io时间
+
+#### iostat 工具
+
+可以提供详尽的I/O信息。如果只看磁盘信息，可以使用-d参数。即：`iostat -d 1 3`（每1秒采集一次持续3次）
+
+- tps列表示该设备每秒的传输次数
+- Blk_read/s列表示每秒读取块数
+- Blk_wrtn/s列表示每秒写入块数
+- Blk_read列表示读取块数总量
+- Blk_wrtn列表示写入块数总量
+
+### JDK 工具详解
+
+#### jps
+
+用于列出Java的进程。
+
+```
+jps            列出java进程id和类名
+jps -q         仅列出java进程id
+jps -m         输出java进程的入参
+jps -l         输出主函数的完整路径
+jps -v         显示传递给JVM的参数
+```
+
+#### jstat
+
+用于查看堆中的运行信息。
+
+```
+jstat -class -t <PID> 1000 5     查看ClassLoader相关信息，每1000毫秒打印1次，一共打印5次
+jstat -compiler -t <PID>          查看指定进程的编译信息
+jstat -gc <PID>                  查看指定进程的堆信息
+jstat -gccapacity <PID>          查看指定进程中每个代的容量与使用情况
+jstat -gccause <PID>             显示最近一次gc信息
+jstat -gcmetacapacity <PID>      查看指定进程的元空间使用信息
+jstat -gcnew <PID>               查看指定进程的新生代使用信息
+jstat -gcnewcapacity <PID>       查看指定进程的新生代各区大小信息
+jstat -gcold <PID>               查看指定进程的老年代使用信息
+jstat -gcoldcapacity <PID>       查看指定进程的老年代各区大小信息
+jstat -gcutil <PID>              查看指定进程的GC回收信息
+jstat -printcompilation <PID>    查看指定进程的JIT编译方法统计信息
+```
+
+#### jinfo
+
+用于查看运行中java进程的虚拟机参数。
+
+```
+jinfo -flag MaxTenuringThreshold <PID>  查看指定进程的虚拟机参MaxTenuringThreshold 的值
+jinfo -flag +PrintGCDetails <PID>        动态添加进程虚拟机参数+PrintGCDetails，开启GC日志打印
+jinfo -flag -PrintGCDetails <PID>        动态移除进程虚拟机参数+PrintGCDetails，关闭GC日志打印
+```
+
+#### jmap
+
+命令用于生成指定java进程的dump文件；可以查看堆内对象实例的统计信息，查看ClassLoader信息和finalizer队列信息。
+
+```
+jmap -histo <PID> > a.txt                输出进程实例个数与合计到文件a.txt中
+jmap -dump:format=b,file=b.hprof <PID>   输出进程的堆快照
+```
+
+#### jhat
+
+命令用于分析jmap生成的堆快照。
+
+```
+jhat b.hprof         分析堆快照b.hprof，通过 http://127.0.0.1:7000 查看
+```
+
+#### jstack
+
+命令用于导出指定java进程的堆栈信息。
+
+```
+jstack -l <PID> > d.txt    输出进程的堆栈信息到文件d.txt中
+```
+
+#### jcmd
+
+命令用于导出指定java进程的堆栈信息，查看进程，GC等。
+
+```
+jcmd -l                     列出java进程列表
+jcmd <PID> help            输出进程所支持的jcmd指令
+jcmd <PID> VM.uptime       查看java进程启动时间
+jcmd <PID> Thread.print    打印线程栈信息
+jcmd <PID> GC.class_histogram  查看系统中类的统计信息
+jcmd <PID> GC.heap_dump    导出堆信息
+jcmd <PID> VM.system_properties  获得系统的Properties内容
+jcmd <PID> VM.flags        获得启动参数
+jcmd <PID> PerfCounter.print  获得性能统计相关数据
+```
+
+---
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/04_JavaJVMSubject/07、性能监控与故障排查|07、性能监控与故障排查]]
