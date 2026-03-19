@@ -474,4 +474,58 @@ class SimpleMutex implements Lock {
 
 ---
 
+## 附录：PDF补充 AQS源码解析
+
+### ReentrantLock 创建
+
+```java
+// 重入锁默认采用非公平锁
+public ReentrantLock() {
+    sync = new NonfairSync();
+}
+
+// true：公平锁  false：非公平锁
+public ReentrantLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+}
+```
+
+### 公平锁与非公平锁的区别
+
+**非公平锁**的 lock 方法：不管三七二十一，上来就要去抢锁，才不管你前面排队多少线程等待获取锁呢！很像那种去超市结账没有素质插队的人。
+
+**公平锁**的 lock 方法：先检查是否有线程在排队，如果有则乖乖排队。
+
+### acquire(1) 流程
+
+1. 先执行 tryAcquire(1) 尝试抢锁
+2. 如果抢锁失败，则执行 addWaiter(Node.EXCLUSIVE) 将当前线程加入等待队列
+3. 执行 acquireQueued(...) 在队列中等待获取锁
+
+### FairSync.tryAcquire(arg) 源码解析
+
+```java
+protected final boolean tryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();
+    int c = getState();
+    
+    // case1：如果c等于0，说明可以抢占锁
+    if (c == 0) {
+        // 如果线程不需要排队 并且 抢占锁成功
+        if (!hasQueuedPredecessors() && compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+    }
+    // case2：如果c不等于0，判断是否是重入操作
+    else if (current == getExclusiveOwnerThread()) {
+        int nextc = c + acquires;
+        if (nextc < 0) throw new Error("Maximum lock count exceeded");
+        setState(nextc);
+        return true;
+    }
+    return false;
+}
+```
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/05、AQS（AbstractQueuedSynchronizer）|05、AQS]] | [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/04、Lock 接口与实现|04、Lock 接口与实现]]

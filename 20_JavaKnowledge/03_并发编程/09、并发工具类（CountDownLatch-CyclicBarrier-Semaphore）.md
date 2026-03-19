@@ -473,4 +473,24 @@ class PooledConnection implements Connection {
 
 ---
 
+## 附录：PDF补充 Semaphore详解
+
+### Semaphore信号量
+
+广义上说，Semaphore信号量是对锁的一种扩展；因为无论是内部锁synchronized，还是重入锁ReentrantLock，一次都只允许一个线程访问某一资源，而信号量却可以指定多个线程同时访问某一个资源。
+
+**主要构造函数**：
+```java
+public Semaphore(int permits);        // 准入数
+public Semaphore(int permits, boolean fair); // 公平/非公平
+```
+
+**主要方法**：
+- `acquire()`：获取一个许可证
+- `release()`：释放一个许可证
+- `tryAcquire()`：尝试获取，立即返回
+
+**使用示例**：
+申请了4个准入，循环10个线程，那么将会以4个线程一组为单位进行执行输出。
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/07、并发工具类|07、并发工具类]]

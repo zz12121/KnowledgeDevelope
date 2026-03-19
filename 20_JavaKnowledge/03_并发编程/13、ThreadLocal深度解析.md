@@ -268,4 +268,26 @@ ttlExecutor.submit(() -> {
 
 ---
 
+## 附录：PDF补充 ConcurrentLinkedQueue详解
+
+### ConcurrentLinkedQueue概述
+
+ConcurrentLinkedQueue是一个基于链接节点的无界线程安全队列，它采用先进先出的规则对节点进行排序。ConcurrentLinkedQueue算是在高并发环境中性能很好的队列，底层由单向链表组成。
+
+### 节点结构
+
+底层由单向链表组成，每个节点结构如下所示。
+
+### 构造函数
+
+构造函数中，创建了一个空节点（new Node<E>(null)）作为链表中的第一个Node节点，并且头指针head和尾指针tail都指向这个节点。
+
+### add/offer方法
+
+将指定的元素插入到队列的尾部。由于队列是无限的，这个方法永远不会抛出IllegalStateException或返回false。
+
+### poll方法
+
+弹出队首元素，并返回该元素的值。
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/10、线程通信与协作|10、线程通信与协作]]

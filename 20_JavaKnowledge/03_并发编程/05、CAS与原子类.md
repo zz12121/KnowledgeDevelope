@@ -369,4 +369,43 @@ sum() = base + Σ cells[i].value
 
 ---
 
+## 附录：PDF补充 无锁详解
+
+### 什么是无锁
+
+无锁（Lock-Free）是指在并发编程中不使用传统的锁机制，而是通过原子操作（如 CAS）来实现线程安全。
+
+### CAS（Compare-And-Swap）
+
+CAS 是 Compare-And-Swap（比较并交换）的缩写，是一种乐观锁的实现方式。CAS 操作包含三个操作数：
+1. 内存位置（V）
+2. 预期原值（A）
+3. 新值（B）
+
+CAS 的执行过程是：如果内存位置 V 的值等于预期原值 A，则将内存位置 V 的值更新为新值 B；否则，不做任何操作。CAS 返回的是当前位置的真实值。
+
+### AtomicInteger
+
+AtomicInteger 是 Java 并发包中提供的一个原子整数类，内部使用 CAS 来保证线程安全。
+
+### Unsafe
+
+Unsafe 是 sun.misc.Unsafe 类，提供了一些底层操作能力，允许 Java 代码直接操作内存。AtomicInteger 等原子类底层都依赖于 Unsafe 的 CAS 操作。
+
+### AtomicReference
+
+AtomicReference 可以对任意对象进行原子性操作。
+
+### AtomicStampedReference
+
+AtomicStampedReference 解决了 ABA 问题，它在 CAS 操作中同时比较值和版本号。
+
+### AtomicIntegerArray
+
+AtomicIntegerArray 可以对整数数组进行原子性操作。
+
+### AtomicIntegerFieldUpdater
+
+AtomicIntegerFieldUpdater 可以对指定类的指定 volatile 字段进行原子性更新。
+
 **相关面试题** → [[../../10_Developlanguage/001_Java/03_JavaConcurrencySubject/09、原子类|09、原子类]]
