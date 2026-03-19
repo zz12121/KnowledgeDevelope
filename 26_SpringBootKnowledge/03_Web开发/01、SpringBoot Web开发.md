@@ -243,6 +243,139 @@ Spring Boot 3.x 推荐用 `springdoc-openapi`：
 
 ---
 
+## PDF 补充内容
+
+### 1. 静态资源访问原理解析
+
+静态资源访问流程：
+1. 请求进来，先去找 Controller 看能不能处理
+2. 如果不能处理，则尝试去寻找静态资源
+3. 可以通过 `【当前项目根路径 + 静态资源名】` 即 `http://localhost:8080/kangxi.jpg` 的方式访问静态资源
+
+**相关源码**位于 `WebMvcAutoConfiguration.addResourceHandlers()` 方法中：
+
+```java
+private String staticPathPattern = "/**";
+private String[] staticLocations = CLASSPATH_RESOURCE_LOCATIONS;
+private static final String[] CLASSPATH_RESOURCE_LOCATIONS = { 
+    "classpath:/META-INF/resources/",
+    "classpath:/resources/", 
+    "classpath:/static/", 
+    "classpath:/public/" 
+};
+```
+
+**默认静态资源目录优先级**（由高到低）：
+1. `classpath:/META-INF/resources/`
+2. `classpath:/resources/`
+3. `classpath:/static/`
+4. `classpath:/public/`
+
+### 2. Rest 风格请求映射
+
+Rest 风格支持使用 **HTTP 请求方式动词** 来表示对资源的操作：
+
+| HTTP 方法 | 操作 | 示例 |
+|-----------|------|------|
+| GET | 查询 | GET /users |
+| POST | 新增 | POST /users |
+| PUT | 完整更新 | PUT /users/1 |
+| PATCH | 部分更新 | PATCH /users/1 |
+| DELETE | 删除 | DELETE /users/1 |
+
+**携带 `_method` 的表单提交：**
+
+HTML 表单只支持 GET 和 POST，需要通过隐藏字段 `_method` 指定实际请求方式：
+
+```html
+<form action="/users/1" method="post">
+    <input type="hidden" name="_method" value="delete">
+</form>
+```
+
+需要在 `application.yml` 中开启 HiddenHttpMethodFilter：
+
+```yaml
+spring:
+  mvc:
+    hiddenmethod:
+      filter:
+        enabled: true
+```
+
+### 3. HiddenHttpMethodFilter 源码解析
+
+`HiddenHttpMethodFilter` 是实现 Rest 风格的核心 Filter：
+
+```java
+public class HiddenHttpMethodFilter extends OncePerRequestFilter {
+    
+    private static final String METHOD_PARAMETER = "_method";
+    
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+            HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        
+        HttpServletRequest requestToUse = request;
+        
+        // 判断是否为 POST 请求，且包含 _method 参数
+        if ("POST".equals(request.getMethod()) && request.getParameter(METHOD_PARAMETER) != null) {
+            String method = request.getParameter(METHOD_PARAMETER).toUpperCase(Locale.ENGLISH);
+            // 只支持指定的方法类型
+            if (ALLOWED_METHODS.contains(method)) {
+                // 包装请求，将实际方法改为指定的方法
+                requestToUse = new HttpMethodRequestWrapper(request, method);
+            }
+        }
+        
+        filterChain.doFilter(requestToUse, response);
+    }
+    
+    private static final Set<String> ALLOWED_METHODS = 
+            EnumSet.of("PUT", "DELETE", "PATCH");
+}
+```
+
+### 4. 自定义入参 Converter 实现
+
+如果需要将请求参数转换为特定的 Java 对象，可以自定义 `Converter`：
+
+```java
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    
+    @Override
+    public void addFormatters(FormatterRegistry registry) {
+        // 注册自定义 Converter
+        registry.addConverter(new StringToUserConverter());
+    }
+}
+
+public class StringToUserConverter implements Converter<String, User> {
+    @Override
+    public User convert(String source) {
+        // source 格式：id,name
+        String[] parts = source.split(",");
+        User user = new User();
+        user.setId(Long.parseLong(parts[0]));
+        user.setName(parts[1]);
+        return user;
+    }
+}
+```
+
+使用示例：
+```java
+@GetMapping("/user")
+public User getUser(User user) {
+    // 请求 /user?id=1,name=test 会自动将参数转换为 User 对象
+    return user;
+}
+```
+
+---
+
 ## 相关面试题 →
 
 [[../../10_Developlanguage/005_Spring/03_SpringBootSubject/04、Web 开发]]

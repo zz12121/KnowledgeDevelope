@@ -176,6 +176,117 @@ public class MyServiceAutoConfiguration {
 
 ---
 
+## PDF 补充内容
+
+### 1. SpringBoot Starter 分类
+
+SpringBoot 提供的 Starter 分为三类：
+
+| 分类 | 说明 | 示例 |
+|------|------|------|
+| **application starters** | 应用级 Starter，最常用 | spring-boot-starter-web、spring-boot-starter-data-jpa |
+| **production starters** | 生产级 Starter，提供监控、健康检查等 | spring-boot-starter-actuator |
+| **technical starters** | 技术级 Starter，集成第三方技术 | spring-boot-starter-undertow、spring-boot-starter-logging |
+
+**核心 Starter：**
+- `spring-boot-starter`：核心 Starter，包含自动配置、日志、YAML 配置支持
+- `spring-boot-starter-web`：Web 应用 Starter，内嵌 Tomcat
+- `spring-boot-starter-actuator`：生产级监控 Starter
+
+### 2. @SpringBootApplication 注解源码解析
+
+`@SpringBootApplication` 是一个复合注解，展开后包含三个核心注解：
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@SpringBootConfiguration    // 等价于 @Configuration
+@EnableAutoConfiguration    // 启用自动配置
+@ComponentScan              // 组件扫描（默认扫描主类所在包及其子包）
+public @interface SpringBootApplication {
+    // 排除特定自动配置类
+    Class<?>[] exclude() default {};
+    // 排除特定自动配置类名称
+    String[] excludeName() default {};
+    // 指定包扫描路径
+    String[] scanBasePackages() default {};
+    // 指定要扫描的组件类型
+    Class<?>[] scanBasePackageClasses() default {};
+}
+```
+
+**注意**：`scanBasePackages` 默认值为空，实际效果等价于扫描主类所在的包及其子包。
+
+### 3. 按需开启自动配置
+
+SpringBoot 虽然加载了 `spring.factories`（Spring Boot 2.x）或 `spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`（Spring Boot 3.x）中所有配置的类，但并非全部加载到 IOC 容器中，而是采用**按需加载**（即 `@ConditionalOnXXX` 条件注解）的方式进行加载。
+
+**按需加载的应用场景：**
+
+| 场景 | 示例 | 说明 |
+|------|------|------|
+| 容错兼容 | `DispatcherServletAutoConfiguration.multipartResolver` | 如果用户已配置，则使用用户的配置 |
+| 用户配置优先 | `WebMvcAutoConfiguration.defaultViewResolver` | 自动配置只是默认值，用户配置优先 |
+| 外部配置项修改组件行为 | `WebMvcAutoConfiguration.messageConverters` | 通过配置属性控制组件行为 |
+
+**查看自动配置情况：**
+```yaml
+# 在 application.yml 中添加
+debug: true
+```
+启动应用后，控制台会输出详细的自动配置报告。
+
+### 4. 常用注解详解
+
+| 注解 | 说明 |
+|------|------|
+| `@Configuration` | 定义配置类，之前的 Spring 配置写在 xml 里，现在建议写在配置类中 |
+| `@ComponentScan` | 定义扫描路径，默认扫描主类所在包及其子包 |
+| `@Bean` | 默认方法名就是 bean 的 id，返回类型就是方法返回的类型。也可 `@Bean("xxx")` 指定 bean 名称 |
+| `@Import` | 给容器中自动创建出注解中指定的组件，默认组件名字就是全类名 |
+| `@Conditional` | 满足指定条件时，才向 IOC 容器中注入组件 |
+| `@ImportResource` | 指定对应的 xml 文件，Spring 就可以把 xml 中配置的 Bean 都加载到 IOC 中 |
+
+### 5. 配置绑定方式
+
+**方式一：@ConfigurationProperties + @Component**
+```java
+@Component
+@ConfigurationProperties(prefix = "my.config")
+public class MyProperties {
+    private String name;
+    private int timeout;
+}
+```
+
+**方式二：@ConfigurationProperties + @EnableConfigurationProperties**
+```java
+@Configuration
+@EnableConfigurationProperties(MyProperties.class)
+public class MyAutoConfiguration {
+}
+```
+
+**添加配置提醒（IDE 提示）：**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-configuration-processor</artifactId>
+    <optional>true</optional>
+</dependency>
+```
+
+### 6. YAML 书写规则
+
+- 大小写敏感
+- 使用缩进表示层级关系，缩进不允许使用 tab，只允许空格
+- 缩进的空格数不重要，只要层级对齐即可
+- '#' 表示注释
+- 字符串无需加引号，如果加了，双引号表示转义字符，单引号表示普通字符
+
+---
+
 ## 相关面试题 →
 
 [[../../10_Developlanguage/005_Spring/03_SpringBootSubject/01、Spring Boot 基础概念]]

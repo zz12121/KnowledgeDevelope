@@ -409,8 +409,325 @@ public abstract class TransactionSynchronizationManager {
 
 ---
 
-## 十一、相关源码文件
+## 十二、PDF补充内容：声明式事务深度解析
+
+### 12.1 事务使用示例（XML配置方式）
+
+```xml
+<!-- 开启事务注解驱动 -->
+<tx:annotation-driven transaction-manager="transactionManager"/>
+
+<!-- 配置事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+
+<!-- 配置数据源 -->
+<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+    <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+    <property name="url" value="jdbc:mysql://localhost:3306/muse"/>
+    <property name="username" value="root"/>
+    <property name="password" value="root"/>
+</bean>
+```
+
+```java
+// 事务配置
+@Transactional(propagation = Propagation.REQUIRED)
+public interface UserService {
+    void save(User user);
+}
+
+// 服务实现
+public class UserServiceImpl implements UserService {
+    private JdbcTemplate jdbcTemplate;
+    
+    public UserServiceImpl(DataSource dataSource) {
+        this.jdbcTemplate = new JdbcTemplate(dataSource);
+    }
+    
+    @Override
+    public void save(User user) {
+        jdbcTemplate.update("insert into tb_user(name, age) values(?, ?)", 
+            new Object[]{user.getName(), user.getAge()});
+    }
+}
+```
+
+### 12.2 @EnableTransactionManagement 注册流程
+
+```java
+// @EnableTransactionManagement → @Import(TransactionManagementConfigurationSelector.class)
+public class TransactionManagementConfigurationSelector
+        extends AdviceModeImportSelector<EnableTransactionManagement> {
+    
+    @Override
+    protected String[] selectImports(AdviceMode adviceMode) {
+        return switch (adviceMode) {
+            case PROXY -> new String[] {
+                AutoProxyRegistrar.class.getName(),                      // 注册AutoProxyCreator
+                ProxyTransactionManagementConfiguration.class.getName()  // 注册事务Advisor
+            };
+            case ASPECTJ -> new String[] { ... };
+        };
+    }
+}
+```
+
+**注册步骤**：
+1. 注册 InfrastructureAdvisorAutoProxyCreator 类型的APC
+2. 创建 AnnotationTransactionAttributeSource 类型的BeanDefinition
+3. 创建 TransactionInterceptor 类型的BeanDefinition
+4. 创建 BeanFactoryTransactionAttributeSourceAdvisor 类型的BeanDefinition
+
+### 12.3 事务增强器解析
+
+**BeanFactoryTransactionAttributeSourceAdvisor 类图**：
+- 实现 PointcutAdvisor 接口
+- 包含 TransactionAttributeSourcePointcut（切点）
+- 包含 TransactionInterceptor（通知）
+
+### 12.4 事务属性解析流程
+
+```java
+// computeTransactionAttribute 方法解析顺序：
+// 1. 查看specificMethod的方法上是否存在@Transactional注解
+// 2. 查看specificMethod的类上是否存在@Transactional注解
+// 3. 查看method的方法上是否存在@Transactional注解
+// 4. 查看method的类上是否存在@Transactional注解
+
+// SpringTransactionAnnotationParser 解析属性
+protected TransactionAttribute parseTransactionAnnotation(AnnotationAttributes attributes) {
+    RuleBasedTransactionAttribute rbta = new RuleBasedTransactionAttribute();
+    
+    // 解析propagation属性
+    rbta.setPropagationBehavior(attributes.getEnum("propagation").value());
+    
+    // 解析isolation属性
+    rbta.setIsolationLevel(attributes.getEnum("isolation").value());
+    
+    // 解析timeout属性
+    rbta.setTimeout(attributes.getNumber("timeout").intValue());
+    
+    // 解析readOnly属性
+    rbta.setReadOnly(attributes.getBoolean("readOnly"));
+    
+    // 解析rollbackFor/noRollbackFor属性
+    List<RollbackRuleAttribute> rollbackRules = new ArrayList<>();
+    for (Class<?> rbRule : attributes.getClassArray("rollbackFor")) {
+        rollbackRules.add(new RollbackRuleAttribute(rbRule));
+    }
+    for (Class<?> rbRule : attributes.getClassArray("noRollbackFor")) {
+        rollbackRules.add(new NoRollbackRuleAttribute(rbRule));
+    }
+    rbta.setRollbackRules(rollbackRules);
+    
+    return rbta;
+}
+```
+
+### 12.5 doGetTransaction() 获得数据库事务实例
+
+```java
+// DataSourceTransactionManager.java
+protected Object doGetTransaction() {
+    DataSourceTransactionObject txObject = new DataSourceTransactionObject();
+    // 返回是否允许嵌套事务，默认为false
+    txObject.setSavepointAllowed(isNestedTransactionAllowed());
+    
+    // 获得数据源DataSource，并由此试图获取ConnectionHolder实例对象
+    ConnectionHolder conHolder = (ConnectionHolder) 
+        TransactionSynchronizationManager.getResource(obtainDataSource());
+    txObject.setConnectionHolder(conHolder, false);
+    return txObject;
+}
+```
+
+### 12.6 doBegin() 开启新事务
+
+```java
+// DataSourceTransactionManager.java
+protected void doBegin(Object transaction, TransactionDefinition definition) {
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+    
+    try {
+        // 如果没有数据库连接，则获取新的数据库连接
+        if (txObject.getConnectionHolder() == null) {
+            Connection con = DataSourceUtils.getConnection(obtainDataSource());
+            txObject.setConnectionHolder(new ConnectionHolder(con), true);
+        }
+        
+        // 设置隔离级别
+        Integer isolationLevel = definition.getIsolationLevel();
+        if (isolationLevel != TransactionDefinition.ISOLATION_DEFAULT) {
+            txObject.setPreviousIsolationLevel(con.getTransactionIsolation());
+            con.setTransactionIsolation(isolationLevel);
+        }
+        
+        // 设置是否为只读
+        if (definition.isReadOnly() && txObject.isNewConnectionHolder()) {
+            con.setReadOnly(definition.isReadOnly());
+        }
+        
+        // 关闭自动提交，由Spring控制事务
+        if (con.getAutoCommit()) {
+            txObject.setMustRestoreAutoCommit(true);
+            con.setAutoCommit(false);
+        }
+        
+        // 绑定到当前线程
+        TransactionSynchronizationManager.bindResource(
+            obtainDataSource(), txObject.getConnectionHolder());
+    } catch (Throwable ex) {
+        // 异常处理
+    }
+}
+```
+
+### 12.7 事务提交流程（processCommit）
+
+```java
+// AbstractPlatformTransactionManager.java
+private void processCommit(DefaultTransactionStatus status) throws TransactionException {
+    try {
+        boolean beforeCompletionInvoked = false;
+        try {
+            boolean unexpectedRollback = false;
+            
+            // 触发beforeCommit
+            triggerBeforeCommit(status);
+            // 触发beforeCompletion
+            triggerBeforeCompletion(status);
+            beforeCompletionInvoked = true;
+            
+            // 1. 如果有保存点（嵌套事务），释放保存点，不提交
+            if (status.hasSavepoint()) {
+                unexpectedRollback = status.isGlobalRollbackOnly();
+                status.releaseHeldSavepoint();
+            }
+            // 2. 如果是新事务，执行提交
+            else if (status.isNewTransaction()) {
+                unexpectedRollback = status.isGlobalRollbackOnly();
+                doCommit(status);  // 调用Connection.commit()
+            }
+            
+            if (unexpectedRollback) {
+                throw new UnexpectedRollbackException("Transaction rolled back");
+            }
+        }
+        catch (RuntimeException | Error ex) {
+            if (!beforeCompletionInvoked) {
+                triggerBeforeCompletion(status);
+            }
+            doRollbackOnCommitException(status, ex);
+            throw ex;
+        }
+        // 触发afterCommit
+        triggerAfterCommit(status);
+    }
+    finally {
+        // 清理资源
+        cleanupAfterCompletion(status);
+    }
+}
+```
+
+### 12.8 事务回滚流程（processRollback）
+
+```java
+private void processRollback(DefaultTransactionStatus status, boolean unexpected) {
+    try {
+        boolean unexpectedRollback = status.isGlobalRollbackOnly();
+        
+        try {
+            // 1. 如果有保存点，回滚到保存点
+            if (status.hasSavepoint()) {
+                status.rollbackToHeldSavepoint();
+            }
+            // 2. 如果是新事务，执行回滚
+            else if (status.isNewTransaction()) {
+                doRollback(status);  // 调用Connection.rollback()
+            }
+            // 3. 如果是嵌套事务，标记rollbackOnly
+            else if (status.hasTransaction()) {
+                if (status.isLocalRollbackOnly() || unexpectedRollback) {
+                    doSetRollbackOnly(status);
+                }
+            }
+        }
+        finally {
+            // 触发afterCompletion
+            triggerAfterCompletion(status, TransactionSynchronization.STATUS_ROLLED_BACK);
+        }
+    }
+    finally {
+        // 清理资源
+        cleanupAfterCompletion(status);
+    }
+}
+```
+
+### 12.9 suspend() 挂起事务
+
+```java
+protected final SuspendedResourcesHolder suspend(@Nullable Object transaction) {
+    // 如果当前线程的事务同步处于活跃状态
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        // 暂停所有事务同步
+        List<TransactionSynchronization> suspendedSynchronizations = doSuspendSynchronization();
+        
+        try {
+            Object suspendedResources = doSuspend(transaction);
+            
+            // 保存当前事务信息到SuspendedResourcesHolder
+            String name = TransactionSynchronizationManager.getCurrentTransactionName();
+            TransactionSynchronizationManager.setCurrentTransactionName(null);
+            
+            boolean readOnly = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+            TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
+            
+            Integer isolationLevel = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
+            TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(null);
+            
+            boolean wasActive = TransactionSynchronizationManager.isActualTransactionActive();
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+            
+            return new SuspendedResourcesHolder(suspendedResources, suspendedSynchronizations,
+                name, readOnly, isolationLevel, wasActive);
+        }
+        catch (RuntimeException | Error ex) {
+            doResumeSynchronization(suspendedSynchronizations);
+            throw ex;
+        }
+    }
+    // 如果事务同步不活跃但有事务
+    else if (transaction != null) {
+        Object suspendedResources = doSuspend(transaction);
+        return new SuspendedResourcesHolder(suspendedResources);
+    }
+    else {
+        return null;
+    }
+}
+```
+
+### 12.10 事务失效场景补充
+
+| 失效场景 | 原因分析 |
+|---------|---------|
+| 同类内部方法调用 | this.method()不经过代理，TransactionInterceptor不生效 |
+| private/protected方法 | CGLIB无法重写，TransactionAttributeSourcePointcut不匹配 |
+| 非Spring管理的Bean | 不经过BeanPostProcessor，没有代理 |
+| 多线程调用 | ThreadLocal线程隔离，子线程无事务上下文 |
+| 异常被catch吞掉 | completeTransactionAfterThrowing收不到异常，走了commit |
+| checked异常未配置rollbackFor | 默认只对RuntimeException和Error回滚 |
+| 传播行为配置错误 | REQUIRED配置导致嵌套事务被合并 |
+
+---
+
+## 十三、相关源码文件
 
 - [[../03_AOP源码/01、AOP代理创建源码]]
 - [[02、事务传播行为与隔离级别]]
 - [[../07_扩展点源码/03、事件机制源码]]
+

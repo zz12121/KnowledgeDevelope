@@ -375,10 +375,252 @@ ExposeInvocationInterceptor.invoke()
 | @Transactional 的代理是在哪创建的？ | 同一流程，`TransactionInterceptor` 也是 MethodInterceptor |
 | 同一个类多个切面如何排序？ | `@Order`/`Ordered` 接口，`sortAdvisors()` |
 
+
+
 ---
 
-## 十、相关源码文件
+## 十一、PDF补充内容：AOP源码深度解析
 
-- [[../02_Bean生命周期源码/01、Bean实例化源码]]
+### 11.1 AOP核心概念
+
+| 概念 | 说明 |
+|------|------|
+| **Aspect（切面）** | 切面泛指交叉业务逻辑，常用的切面是通知（Advice），是对主业务逻辑的一种增强 |
+| **Pointcut（切入点）** | 声明的一个或多个连接点的集合，通过切入点指定一组方法。被标记为final的方法不能作为连接点与切入点 |
+| **Advice（通知/增强）** | 表示切面的执行时间，定义了增强代码切入到目标代码的时间点（之前/之后执行等） |
+| **JoinPoint（连接点）** | 连接切面的业务方法，指可以被切面织入的具体方法，通常业务接口中的方法均为连接点 |
+| **Target（目标对象）** | 指将要被增强的对象，即包含主业务逻辑的类的对象 |
+
+### 11.2 @EnableAspectJAutoProxy 注册过程
+
+```java
+// @EnableAspectJAutoProxy → @Import(AspectJAutoProxyRegistrar.class)
+class AspectJAutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
+    @Override
+    public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata,
+            BeanDefinitionRegistry registry) {
+        // 注册AnnotationAwareAspectJAutoProxyCreator
+        AopConfigUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(registry);
+        
+        // 处理proxyTargetClass属性
+        if (enableAspectJAutoProxy.getBoolean("proxyTargetClass")) {
+            AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);
+        }
+        // 处理exposeProxy属性
+        if (enableAspectJAutoProxy.getBoolean("exposeProxy")) {
+            AopConfigUtils.forceAutoProxyCreatorToExposeProxy(registry);
+        }
+    }
+}
+```
+
+### 11.3 APC优先级别说明
+
+Spring的抽象类AbstractAdvisorAutoProxyCreator默认有4个实现类，优先级如下（数字越大优先级越高）：
+
+| 优先级 | APC实现类 |
+|--------|----------|
+| 第0级别 | InfrastructureAdvisorAutoProxyCreator |
+| 第1级别 | AspectJAwareAdvisorAutoProxyCreator |
+| 第2级别 | AnnotationAwareAspectJAutoProxyCreator |
+
+```java
+// APC优先级列表
+private static final List<Class<?>> APC_PRIORITY_LIST = new ArrayList<>(3);
+static {
+    APC_PRIORITY_LIST.add(InfrastructureAdvisorAutoProxyCreator.class);  // 第0级别
+    APC_PRIORITY_LIST.add(AspectJAwareAdvisorAutoProxyCreator.class);   // 第1级别
+    APC_PRIORITY_LIST.add(AnnotationAwareAspectJAutoProxyCreator.class); // 第2级别
+}
+```
+
+### 11.4 proxyTargetClass与exposeProxy属性
+
+**proxyTargetClass属性**：
+- 配置为`true`时，强制使用CGLIB代理
+- 配置方式：`<aop:aspectj-autoproxy proxy-target-class="true"/>`
+
+**exposeProxy属性**：
+- 配置为`true`时，支持通过`AopContext.currentProxy()`获取当前代理类
+- 解决内部方法调用不走代理的问题
+
+**使用场景举例**：
+```java
+@Service
+public class AServiceImpl implements AService {
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void a() {
+        // 由于this指向target对象，所以不会执行b事务切面
+        this.b(); 
+        
+        // 暴露了当前的代理类，所以可以执行b事务切面
+        ((AService) AopContext.currentProxy()).b(); 
+    }
+    
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void b() {}
+}
+```
+
+### 11.5 findCandidateAdvisors() 获取所有增强器
+
+获取所有增强器分为两个步骤：
+
+**步骤1**：寻找在IOC中注册过的Advisor接口的实现类
+```java
+protected List<Advisor> findCandidateAdvisors() {
+    return this.advisorRetrievalHelper.findAdvisorBeans();
+}
+```
+
+**步骤2**：寻找在IOC中注册过的使用@Aspect注解的增强类
+```java
+// 通过buildAspectJAdvisors()方法解析@Aspect注解的类
+List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
+```
+
+### 11.6 @DeclareParents注解的使用
+
+@DeclareParents是引介增强的注解形式实现，可以在代理目标类上动态添加新的方法（实现接口）。
+
+**使用示例**：
+```java
+// 定义支付接口
+public interface IPay {
+    void pay();
+}
+
+// 定义支付插件接口
+public interface IPayPlugin {
+    void payPlugin();
+}
+
+// 支付插件实现类
+@Service
+public class AlipayPlugin implements IPayPlugin {
+    @Override
+    public void payPlugin() {
+        System.out.println("-------Alipay--------");
+    }
+}
+
+// 使用@DeclareParents配置切面
+@Aspect
+@Component
+public class PayAspectJ {
+    // value: 目标接口（IPay+表示IPay的子类）
+    // defaultImpl: 实现的接口
+    @DeclareParents(value = "com.muse.springbootdemo.entity.aop.IPay+",
+                    defaultImpl = AlipayPlugin.class)
+    public IPayPlugin alipayPlugin;
+}
+```
+
+### 11.7 wrapIfNecessary() 不需要增强的情况
+
+以下情况不需要增强：
+1. **targetSourcedBeans中已存在**：已经处理过的bean
+2. **advisedBeans中value为false**：明确不需要增强
+3. **基础设施类**：实现Advices、Pointcut、Advisors、AopInfrastructureBeans四个接口的类
+4. **Original实例**：以beanClass.getName()开头，并以".ORIGINAL"结尾的类
+
+### 11.8 创建代理的流程（createProxy）
+
+```java
+protected Object createProxy(Class<?> beanClass, String beanName, Object[] specificInterceptors, 
+                             TargetSource targetSource) {
+    // 步骤1：创建ProxyFactory实例对象
+    ProxyFactory proxyFactory = new ProxyFactory();
+    proxyFactory.copyFrom(this);
+    
+    // 步骤2-4：设置代理方式（JDK或CGLIB）
+    if (!proxyFactory.isProxyTargetClass()) {
+        if (shouldProxyTargetClass(beanClass, beanName)) 
+            proxyFactory.setProxyTargetClass(true);
+        else 
+            evaluateProxyInterfaces(beanClass, proxyFactory);
+    }
+    
+    // 步骤5：获得所有增强器并添加到proxyFactory
+    Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+    proxyFactory.addAdvisors(advisors);
+    
+    // 步骤6：设置被代理的类
+    proxyFactory.setTargetSource(targetSource);
+    
+    // 步骤7：定制代理（空方法）
+    customizeProxyFactory(proxyFactory);
+    
+    // 步骤8：通过getProxy获得代理对象
+    return proxyFactory.getProxy(classLoader);
+}
+```
+
+### 11.9 JDK动态代理与CGLIB代理的选择
+
+```java
+public AopProxy createAopProxy(AdvisedSupport config) {
+    if (!NativeDetector.inNativeImage() &&
+        (config.isOptimize() || config.isProxyTargetClass() || 
+         hasNoUserSuppliedProxyInterfaces(config))) {
+        
+        Class<?> targetClass = config.getTargetClass();
+        
+        // 如果是接口或代理类，使用JDK动态代理
+        if (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) {
+            return new JdkDynamicAopProxy(config);
+        }
+        // 否则，使用CGLIB代理
+        return new ObjenesisCglibAopProxy(config);
+    }
+    return new JdkDynamicAopProxy(config);
+}
+```
+
+**选择规则**：
+- 目标类是接口 → JDK动态代理
+- proxyTargetClass=true → CGLIB代理
+- 没有实现接口 → CGLIB代理
+
+### 11.10 ReflectiveMethodInvocation.proceed() 执行流程
+
+```java
+public Object proceed() throws Throwable {
+    // 执行完所有增强后执行切点方法
+    if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+        return invokeJoinpoint();
+    }
+    
+    // 获取下一个要执行的拦截器
+    Object interceptorOrInterceptionAdvice = 
+        this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+    
+    // 动态匹配
+    if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
+        // 运行时匹配切点
+        return dm.interceptor.invoke(this);
+    }
+    // 普通拦截器，直接调用
+    return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+}
+```
+
+拦截器链执行顺序（以@Around + @Before + @After为例）：
+```
+ExposeInvocationInterceptor.invoke()
+└── AspectJAroundAdvice.invoke()      ← @Around前半段
+    └── MethodBeforeAdviceInterceptor.invoke()
+        ├── @Before方法执行
+        └── proceed() → 目标方法执行
+        ← @AfterReturning方法执行
+    ← @After方法执行（finally中）
+← @Around后半段
+```
+
+---
+
+## 十二、相关源码文件
+
 - [[02、AOP切点与通知源码]]
 - [[../04_事务源码/01、@Transactional源码解析]]
+
