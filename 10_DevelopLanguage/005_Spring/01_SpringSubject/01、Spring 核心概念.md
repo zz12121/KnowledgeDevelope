@@ -161,3 +161,250 @@ Spring 是模块化设计，核心模块按功能分为几大类：
 - **启动较慢**：Spring Boot 应用随着 Bean 增多，启动时间会明显变长
 
 📖 [[../../../24_SpringKnowledge/01_IoC与DI/01、IoC控制反转与依赖注入]]
+
+---
+
+###### 7.1 你项目中是怎么使用Spring的？——高频面试引导问题
+
+面试官问这个问题是想了解你是否有过**真实的Spring开发经验**，以及你对Spring生态的理解深度。
+
+**常见使用场景**：
+
+| 场景 | 使用方式 | 注意事项 |
+|------|---------|---------|
+| Bean管理 | @Component/@Service/@Repository/@Controller | 按层选择注解 |
+| 依赖注入 | 构造器注入（推荐） | 避免循环依赖 |
+| 事务管理 | @Transactional | 注意失效场景 |
+| AOP | @Aspect | 理解JDK动态代理和CGLIB |
+| 配置管理 | @Configuration + @Bean | 区分配置类和组件类 |
+
+**回答示例**：
+
+> 我们项目里用的是 Spring Boot，主要使用方式：
+> 1. **Bean 管理**：日常开发用 `@Service` 和 `@Component` 管理 Bean，通过构造器注入依赖（不用字段注入，方便单元测试）
+> 2. **配置管理**：用 `@ConfigurationProperties` 读取配置到 POJO，支持配置校验（`@Validated`），敏感配置用 `@Encrypted` 自己实现
+> 3. **事务管理**：service 层方法加 `@Transactional`，传播行为用 `REQUIRED`，隔离级别根据业务选（读多写少用 READ_COMMITTED）
+> 4. **异常处理**：用 `@ControllerAdvice` 统一处理异常，返回统一格式
+> 5. **参数校验**：用 JSR-303 注解（`@NotNull`、`@Valid` 等），在 controller 层做第一道校验，service 层做业务校验
+>
+> 追问：为什么用构造器注入不用字段注入？
+> - 构造器注入保证依赖不为空，编译期就能发现循环依赖
+> - 字段注入容易让人忽略依赖关系，单元测试也不方便 mock
+> - 当然，构造器注入依赖多了（比如超过5个）要考虑拆分服务
+
+**技术选型建议**：
+- 微服务 → Spring Cloud
+- 快速开发 → Spring Boot
+- 响应式编程 → Spring WebFlux
+- 传统企业级开发 → Spring MVC + Spring
+
+---
+
+###### 7.2 Spring的IoC和DI是什么？——高频面试引导问题
+
+**概念解释**：
+
+| 概念 | 全称 | 说明 |
+|------|------|------|
+| IoC | Inversion of Control | 控制反转，把对象创建权交给Spring |
+| DI | Dependency Injection | 依赖注入，Spring自动注入依赖对象 |
+
+**回答示例**：
+
+> IoC和DI其实是一回事：
+> - IoC是思想：把对象创建权反转给容器
+> - DI是实现：通过反射等方式注入依赖
+>
+> 追问：为什么需要IoC？
+> - 降低耦合：对象间不直接依赖，通过容器注入
+> - 方便测试：可以注入mock对象
+> - 便于管理生命周期：单例、多例由容器控制
+
+---
+
+###### 7.3 Spring的Bean生命周期了解吗？——高频面试引导问题
+
+**生命周期阶段**：
+
+```
+1. 实例化 → new对象
+2. 属性赋值 → setXxx注入
+3. 初始化 → 
+   - BeanNameAware.setBeanName()
+   - BeanFactoryAware.setBeanFactory()
+   - @PostConstruct
+   - InitializingBean.afterPropertiesSet()
+   - 自定义init-method
+4. 销毁 →
+   - @PreDestroy
+   - DisposableBean.destroy()
+   - 自定义destroy-method
+```
+
+**回答示例**：
+
+> 我们常用：
+> - @PostConstruct：初始化后执行
+> - @PreDestroy：销毁前执行
+>
+> 追问：为什么不用构造函数初始化？
+> - 构造函数时依赖可能还没注入完成
+> - @PostConstruct能确保所有依赖都注入完毕
+
+---
+
+###### 7.4 Spring的事务传播行为有哪些？——高频面试传播问题
+
+**7种传播行为**：
+
+| 行为 | 说明 | 常见场景 |
+|------|------|---------|
+| REQUIRED | 有事务加入，没有创建 | 默认 |
+| REQUIRES_NEW | 总是创建新事务 | 日志 |
+| SUPPORTS | 有事务加入，没有则非事务 | 查询 |
+| NOT_SUPPORTED | 非事务执行 | 异步任务 |
+| MANDATORY | 必须在事务中 | 核心业务 |
+| NEVER | 必须不在事务中 | 非事务场景 |
+| NESTED | 嵌套事务 | 批量操作 |
+
+**回答示例**：
+
+> 我们项目用法：
+> - SERVICE层默认REQUIRED
+> - 记录日志用REQUIRES_NEW（保证日志记录成功，即使业务回滚）
+> - 查询用SUPPORTS（不需要事务）
+>
+> 追问：REQUIRED和REQUIRES_NEW区别？
+> REQUIRED会加入外层事务，外层回滚内层也回滚；REQUIRES_NEW独立事务，外层回滚不影响内层。
+
+---
+
+###### 7.5 Spring的事务失效场景有哪些？——高频面试引导问题
+
+**失效场景**：
+
+| 场景 | 原因 | 解决方案 |
+|------|------|---------|
+| 非public方法 | AOP代理限制 | 改为public |
+| 自调用 | 内部方法不经过代理 | 注入自身或AopContext |
+| 异常被catch | 异常未抛出 | throw e |
+| 非Spring管理的bean | 无法代理 | 配置component-scan |
+
+**回答示例**：
+
+> 我们项目遇到的坑：
+> 1. **非public方法**：@Transactional只能加在public方法上
+> 2. **自调用**：this.save()不会触发事务，因为没有经过代理
+> 3. **异常被catch**：必须在finally throw 或直接 throw
+>
+> 追问：自调用怎么解决？
+> - 注入自己：`@Autowired private UserService userService;`
+> - 用AopContext：`enableAspectJProxy(exposeProxy=true)`
+
+---
+
+###### 7.6 Spring如何解决循环依赖？——高频面试引导问题
+
+**循环依赖类型**：
+
+| 类型 | 能否解决 | 方案 |
+|------|---------|------|
+| 构造器循环 | ❌ | 报错 |
+| setter单例 | ✅ | 三级缓存 |
+| prototype | ❌ | 报错 |
+
+**三级缓存**：
+
+```
+singletonObjects（一级）→ 成品bean
+earlySingletonObjects（二级）→ 提前暴露的bean（半成品）
+singletonFactories（三级）→ lambda表达式，生成代理对象
+```
+
+**回答示例**：
+
+> Spring解决setter循环依赖：
+> 1. A创建时发现依赖B，把A的lambda放入三级缓存
+> 2. B创建时发现依赖A，从三级缓存拿到A
+> 3. B创建完成，放入一级缓存
+> 4. A拿到B，完成创建
+>
+> 追问：为什么需要三级缓存？
+> - 二级缓存是为了解决代理问题
+> - 如果不需要代理，二级缓存就够了
+> - 三级缓存主要为了性能，延迟代理对象的创建
+
+---
+
+###### 7.7 Spring的AOP原理是什么？——高频面试引导问题
+
+**AOP核心概念**：
+
+| 概念 | 说明 |
+|------|------|
+| Aspect | 切面（类） |
+| Joinpoint | 连接点（方法） |
+| Pointcut | 切入点（表达式） |
+| Advice | 通知（增强逻辑） |
+| Weaving | 织入 |
+
+**通知类型**：
+
+| 通知 | 执行时机 |
+|------|---------|
+| @Before | 方法前 |
+| @After | 方法后 |
+| @AfterReturning | 返回后 |
+| @AfterThrowing | 异常后 |
+| @Around | 环绕（前后） |
+
+**回答示例**：
+
+> 我们项目AOP用法：
+> - 统一日志：记录请求参数和返回结果
+> - 统一异常：@ControllerAdvice
+> - 事务管理：@Transactional
+> - 性能监控：记录方法执行时间
+>
+> 追问：JDK动态代理和CGLIB区别？
+> - JDK：必须实现接口
+> - CGLIB：继承类
+> - Spring默认CGLIB（性能更好）
+
+---
+
+###### 7.8 Spring Boot的自动装配原理？——高频面试引导问题
+
+**自动装配流程**：
+
+```
+1. @SpringBootApplication = @SpringBootConfiguration + @EnableAutoConfiguration + @ComponentScan
+2. @EnableAutoConfiguration = @Import(AutoConfigurationImportSelector)
+3. AutoConfigurationImportSelector读取META-INF/spring.factories
+4. 加载所有AutoConfiguration类
+5. 按条件@Conditional过滤
+6. 注册Bean
+```
+
+**常见条件注解**：
+
+| 注解 | 条件 |
+|------|------|
+| @ConditionalOnClass | class存在 |
+| @ConditionalOnMissingBean | bean不存在 |
+| @ConditionalOnProperty | 配置存在 |
+| @ConditionalOnWebApplication | 是Web应用 |
+
+**回答示例**：
+
+> 自动装配原理：
+> - Spring Boot启动时扫描classpath下的配置文件
+> - 根据条件注解决定是否加载某些配置
+> - 把符合条件的配置类注册为Bean
+>
+> 追问：如何自定义Starter？
+> 1. 创建autoconfigure模块：写@Configuration + @Conditional
+> 2. 创建starter模块：依赖autoconfigure + META-INF/spring.factories
+> 3. 其他项目引入即可自动配置
+
+---

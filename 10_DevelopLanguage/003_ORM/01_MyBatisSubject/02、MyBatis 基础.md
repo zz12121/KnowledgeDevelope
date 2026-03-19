@@ -91,3 +91,234 @@ SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(configuration);
 **environments（环境配置）**：配置数据源和事务管理器，支持多环境切换（开发/测试/生产），通过 `default` 属性指定当前激活的环境。
 
 **mappers（映射器）**：注册 Mapper XML 文件或 Mapper 接口的位置，支持 `resource`（XML 路径）、`class`（接口全限定名）、`package`（包扫描）等方式。
+
+---
+
+###### 7.1 你项目中用过MyBatis吗？是怎么使用的？——高频面试引导问题
+
+面试官问这个问题是想了解你是否有过**真实的持久层开发经验**，以及你对MyBatis的掌握深度。
+
+**常见使用场景**：
+
+| 场景 | 使用方式 | 注意事项 |
+|------|---------|---------|
+| 增删改查 | XML映射文件或注解 | 用动态SQL处理复杂条件 |
+| 分页查询 | PageHelper插件或RowBounds | 推荐使用PageHelper，更灵活 |
+| 批量操作 | foreach标签 | 注意SQL长度限制 |
+| 关联查询 | association/collection | 考虑使用嵌套查询还是嵌套结果 |
+| 插件开发 | Interceptor接口 | 需理解四大组件的代理机制 |
+
+**回答示例**：
+
+> 我们项目里用的是 MyBatis-Plus，主要考虑是：
+> 1. **减少样板代码**：自带 CRUD 接口，不用每次都写 `SELECT * FROM xxx WHERE id = ?` 这种简单SQL
+> 2. **强大的条件构造器**：`QueryWrapper` 和 `UpdateWrapper` 用起来比 XML 动态 SQL 更简洁
+> 3. **自动填充**：create_time、update_time 这些字段不用手动 set
+> 4. **分页插件**：内置分页插件，配置一下就能用，比手写分页简单太多
+>
+> 当然我们也用了 XML 写复杂查询，特别是多表关联、动态 SQL 条件比较复杂的时候，XML 更加清晰。
+>
+> 追问：为什么不用 Hibernate？
+> Hibernate 虽然更省代码，但 SQL 不可控，我们业务里经常有复杂 SQL 优化需求，MyBatis 更灵活。
+
+**技术选型建议**：
+- 快速开发 + 简单CRUD → MyBatis-Plus
+- 复杂SQL + 需要SQL可控 → MyBatis
+- 对象模型复杂 + 团队Hibernate经验丰富 → Hibernate
+
+---
+
+###### 7.2 MyBatis的执行流程了解吗？——高频面试引导问题
+
+**执行流程**：
+
+```
+1. 加载配置（全局配置文件 + Mapper接口 + 映射文件）
+2. 创建SqlSessionFactory
+3. SqlSession执行SQL
+   - Executor执行器（SIMPLE/REUSE/BATCH）
+   - StatementHandler（参数处理 + SQL执行 + 结果处理）
+   - ParameterHandler（参数映射）
+   - ResultSetHandler（结果映射）
+4. 返回结果
+```
+
+**回答示例**：
+
+> MyBatis四大核心对象：
+> 1. **Executor**：调度SQL执行，有Simple、Reuse、Batch三种模式
+> 2. **StatementHandler**：负责JDBC Statement操作，包括参数设置和SQL执行
+> 3. **ParameterHandler**：把Java对象参数转换为JDBC参数
+> 4. **ResultSetHandler**：把JDBC结果集转换为Java对象
+>
+> 追问：和Spring整合后流程？
+> Spring Boot自动配置，创建SqlSessionFactory和Mapper扫描注册Bean，使用时通过@Autowired注入Mapper代理对象。
+
+---
+
+###### 7.3 MyBatis的$和#有什么区别？——高频面试引导问题
+
+**区别对比**：
+
+| 特性 | #{} | ${} |
+|------|-----|-----|
+| 原理 | 占位符?，预编译 | 字符串拼接 |
+| SQL注入 | 安全 | 危险 |
+| 类型处理 | 自动 | 不处理 |
+| 性能 | 高（预编译） | 低 |
+
+**回答示例**：
+
+> 记住：能用#{}就不用${}
+> - #{}：PreparedStatement参数占位，安全；自动类型转换
+> - ${}：直接字符串拼接，SQL注入风险
+>
+> 什么时候用${}？
+> - 动态表名：`SELECT * FROM ${tableName}`
+> - 动态排序：`ORDER BY ${columnName}`
+> - 批量插入列名：`INSERT INTO user(${columns}) VALUES(${values})`
+>
+> 追问：为什么#{}能防止SQL注入？
+> #{}会生成`?`占位符，参数会以JDBC预编译方式设置，不会被当作SQL的一部分执行。
+
+---
+
+###### 7.4 MyBatis如何实现分页？分页插件原理是什么？——高频面试引导问题
+
+**分页方式**：
+
+| 方式 | 原理 | 适用场景 |
+|------|------|---------|
+| 手动分页 | SQL LIMIT | 通用 |
+| RowBounds | 内存分页 | 数据量小 |
+| PageHelper插件 | 拦截SQL | 推荐 |
+
+**PageHelper原理**：
+
+1. 拦截Executor的query方法
+2. 在SQL后追加LIMIT
+3. ThreadLocal存储分页参数
+4. 查询结束后清除ThreadLocal
+
+**回答示例**：
+
+> 我们用PageHelper：
+> ```java
+> PageHelper.startPage(pageNum, pageSize);
+> List<User> users = userMapper.selectList(null);
+> PageInfo<User> pageInfo = new PageInfo<>(users);
+> ```
+>
+> 原理：插件拦截Executor.query()方法，在SQL后面追加LIMIT，同时把分页参数存到ThreadLocal，结果查询完后在PageInfo里组装total。
+
+---
+
+###### 7.5 MyBatis的一级缓存和二级缓存是什么？——高频面试引导问题
+
+**缓存级别**：
+
+| 级别 | 作用域 | 生命周期 | 默认开启 |
+|------|--------|---------|---------|
+| 一级缓存 | SqlSession | 同一SqlSession | 是 |
+| 二级缓存 | SqlSessionFactory | 跨SqlSession | 否 |
+
+**回答示例**：
+
+> - **一级缓存**：同一个SqlSession内，两次查询相同SQL会命中缓存。但如果有增删改操作，会清空缓存。
+> - **二级缓存**：跨SqlSession，需要手动开启。缓存是以namespace为单位的，一个namespace数据变化会清空整个namespace的缓存。
+>
+> 追问：二级缓存有什么问题？
+> - 脏读：如果A查询后修改了数据，B用缓存读到的就是旧数据
+> - 分布式下无效：二级缓存是单机缓存，分布式环境需要用Redis
+>
+> 我们项目里缓存都是用Redis，MyBatis二级缓存基本不用。
+
+---
+
+###### 7.6 MyBatis如何实现动态SQL？——高频面试引导问题
+
+**动态SQL标签**：
+
+| 标签 | 作用 |
+|------|------|
+| if | 条件判断 |
+| where | 自动处理WHERE |
+| set | 自动处理SET |
+| foreach | 循环遍历 |
+| choose/when/otherwise | 分支选择 |
+| trim | 自定义前后缀 |
+
+**回答示例**：
+
+> 我们项目里动态SQL用法：
+> ```xml
+> <select id="selectByCondition" resultType="User">
+>     SELECT * FROM user
+>     <where>
+>         <if test="name != null and name != ''">
+>             AND name LIKE CONCAT('%', #{name}, '%')
+>         </if>
+>         <if test="status != null">
+>             AND status = #{status}
+>         </if>
+>     </where>
+> </select>
+>
+> <insert id="batchInsert">
+>     INSERT INTO user(name, age) VALUES
+>     <foreach collection="list" item="item" separator=",">
+>         (#{item.name}, #{item.age})
+>     </foreach>
+> </insert>
+> ```
+
+---
+
+###### 7.7 MyBatis的接口方法和XML映射文件是如何关联的？——高频面试引导问题
+
+**关联原理**：
+
+1. Mapper接口定义方法签名
+2. XML中namespace指定接口全限定名
+3. statement的id和方法名一致
+4. MyBatis通过JDK动态代理创建Mapper代理对象
+5. 代理对象根据方法名找XML中的SQL执行
+
+**回答示例**：
+
+> 接口方法如何找到SQL：
+> - namespace = 接口全限定名
+> - statement id = 方法名
+> - parameterType = 参数类型
+> - resultType = 返回值类型
+>
+> 追问：为什么Mapper接口方法能返回实体对象？
+> 因为MyBatis的ResultSetHandler会自动映射列名到属性名（驼峰转换或配置映射）。
+
+---
+
+###### 7.8 MyBatis的插件原理是什么？能用来做什么？——高频面试引导问题
+
+**插件原理**：
+
+- 基于JDK动态代理 + 责任链模式
+- 四大对象都可被拦截：Executor、StatementHandler、ParameterHandler、ResultSetHandler
+- 按顺序执行插件链
+
+**常见插件场景**：
+
+| 插件 | 功能 |
+|------|------|
+| 分页插件 | 拦截query，追加LIMIT |
+| 乐观锁插件 | 拦截update，检查version |
+| 性能监控 | 记录SQL执行时间 |
+| 脱敏插件 | 拦截结果，敏感数据脱敏 |
+
+**回答示例**：
+
+> 我们项目没用插件，原因：
+> 1. 分页用PageHelper更灵活
+> 2. 乐观锁在SQL层面加version字段手写
+> 3. 性能监控用SkyWalking
+>
+> 但插件机制是MyBatis最强大的扩展点，可以拦截四大对象做你想做的事。
