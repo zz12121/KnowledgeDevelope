@@ -202,7 +202,34 @@ Long count = store.get("some-word"); // 直接查询实时状态
 | 生态集成 | 大数据（Flink/Spark/Hadoop） | Java/微服务（Spring Cloud Alibaba） |
 | 适用场景 | 日志采集、实时数仓、流处理 | 电商交易、金融支付、分布式事务 |
 
-### 5.3 四维选型决策矩阵
+### 5.3 Kafka vs ActiveMQ
+
+| 维度 | Kafka | ActiveMQ |
+|------|-------|----------|
+| 定位 | 分布式日志系统、流处理平台 | 企业级消息中间件（JMS 实现） |
+| 吞吐量 | 极高（百万级 TPS） | 中等（万级 TPS） |
+| 消息持久化 | 顺序写磁盘，Page Cache 加速 | JDBC/KahaDB/LevelDB |
+| 消息协议 | 自定义二进制协议 | 支持 AMQP、OpenWire、STOMP、MQTT |
+| 消息模型 | 发布/订阅（基于分区） | Queue + Topic 两种模式 |
+| 集群支持 | 原生分布式，副本机制 | 主从复制、Network of Brokers |
+| 运维复杂度 | 依赖 ZooKeeper/KRaft | 相对简单 |
+| 适用场景 | 日志收集、数据管道、流计算 | 传统企业级应用、兼容 JMS |
+
+### 5.4 Kafka vs ZeroMQ
+
+| 维度 | Kafka | ZeroMQ |
+|------|-------|--------|
+| 定位 | 分布式消息队列（有 Broker） | 底层网络通讯库（无 Broker） |
+| 架构 | 有中心节点（Broker） | 去中心化（P2P） |
+| 消息模式 | 发布/订阅、队列 | Request-Reply、Publisher-Subscriber、Pipeline |
+| 吞吐量 | 高 | 极高（轻量级） |
+| 持久化 | 支持（基于磁盘） | 不支持 |
+| 消息确认 | 支持（ACK 机制） | 支持（但更底层） |
+| 适用场景 | 消息队列、实时流处理 | 进程间通信、微服务间通讯、实时推送 |
+
+> **ZeroMQ 特点**：又称 "史上最快的消息队列"，本质是一个 Socket 封装库，将网络通讯、进程通讯和线程通讯抽象为统一 API。与 RabbitMQ 相比，ZMQ 更像是一个底层通讯库而非传统消息服务器。
+
+### 5.5 四维选型决策矩阵
 
 | 场景 | 推荐选择 | 理由 |
 |------|---------|------|
@@ -214,6 +241,8 @@ Long count = store.get("some-word"); // 直接查询实时状态
 | 分布式事务一致性 | **RocketMQ** | 半消息机制，最成熟的方案 |
 | 海量 Topic/队列数量 | **RocketMQ** | CommitLog 混合存储，支持数万级队列 |
 | 云原生弹性扩展 | **Pulsar** | 存算分离，秒级弹性 |
+| 需要 JMS 兼容性 | **ActiveMQ** | 完全支持 JMS1.1 规范 |
+| 进程间高性能通讯 | **ZeroMQ** | 轻量级、极低延迟、无需消息队列 |
 
 ### 5.4 混合架构模式
 
