@@ -168,6 +168,141 @@ dubbo:
   # 或者不配置，依赖 @Activate 自动激活
 ```
 
+---
+
+###### 源码深度：Dubbo SPI 与 JDK SPI 的核心差异
+
+**JDK SPI 的问题**：
+
+```
+// JDK SPI 配置格式 (META-INF/services/com.xxx.Protocol)
+com.foo.DubboProtocol      ← 只有类名，没有名称
+com.foo.HttpProtocol       ← 一次性加载全部，浪费资源
+com.foo.HessianProtocol
+```
+
+**Dubbo SPI 的改进**：
+
+```
+// Dubbo SPI 配置格式 (META-INF/dubbo/com.xxx.Protocol)
+dubbo=com.foo.DubboProtocol      ← key-value，按需加载，且便于定位错误
+http=com.foo.HttpProtocol
+hessian=com.foo.HessianProtocol
+```
+
+**改进的三大维度**：
+
+| 维度 | JDK SPI | Dubbo SPI |
+|------|---------|-----------|
+| 加载策略 | 全量加载，迭代器遍历 | 按名称按需加载 |
+| 配置格式 | 纯类名 | key=className |
+| 扩展能力 | 无 | 支持 IOC/AOP 注入 |
+
+**ExtensionLoader 核心源码**：
+
+```java
+// 核心方法：getExtension(String name)
+public T getExtension(String name) {
+    if (StringUtils.isEmpty(name)) throw new IllegalArgumentException("...");
+    if ("true".equals(name)) return getDefaultExtension();
+    
+    // 缓存先查
+    Holder<Object> holder = cachedInstances.get(name);
+    Object instance = holder.get();
+    if (instance == null) {
+        synchronized (holder) {
+            instance = holder.get();
+            if (instance == null) {
+                instance = createExtension(name);  // 延迟加载
+                holder.set(instance);
+            }
+        }
+    }
+    return (T) instance;
+}
+
+private T createExtension(String name) {
+    Class<?> clazz = getExtensionClasses().get(name);  // 读配置文件
+    T instance = (T) EXTENSION_INSTANCES.get(clazz);
+    if (instance == null) {
+        EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
+        instance = (T) EXTENSION_INSTANCES.get(clazz);
+    }
+    injectExtension(instance);  // Dubbo IOC：自动注入其他扩展点
+    // 包装 Wrapper（Dubbo AOP）
+    Set<Class<?>> wrapperClasses = cachedWrapperClasses;
+    if (wrapperClasses != null && !wrapperClasses.isEmpty()) {
+        for (Class<?> wrapperClass : wrapperClasses) {
+            instance = injectExtension(
+                (T) wrapperClass.getConstructor(type).newInstance(instance)
+            );
+        }
+    }
+    return instance;
+}
+```
+
+**Dubbo SPI 的 IOC 注入原理**：
+
+```java
+// injectExtension 方法：通过 setter 自动注入其他扩展点
+private T injectExtension(T instance) {
+    for (Method method : instance.getClass().getMethods()) {
+        if (method.getName().startsWith("set")   // setter 方法
+            && method.getParameterTypes().length == 1
+            && Modifier.isPublic(method.getModifiers())) {
+            
+            Class<?> pt = method.getParameterTypes()[0];
+            // 通过 ExtensionFactory 获取要注入的对象（支持从 Spring 容器获取）
+            Object object = objectFactory.getExtension(pt, property);
+            if (object != null) {
+                method.invoke(instance, object);  // 注入
+            }
+        }
+    }
+    return instance;
+}
+```
+
+**Dubbo SPI 的 AOP（Wrapper 机制）**：
+
+```java
+// Wrapper 类：构造函数接受相同接口类型，自动包装成代理链
+public class ProtocolFilterWrapper implements Protocol {
+    private final Protocol protocol;
+    // 构造函数必须接收 Protocol 参数，Dubbo 识别为 Wrapper
+    public ProtocolFilterWrapper(Protocol protocol) {
+        this.protocol = protocol;
+    }
+    @Override
+    public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        // 前置处理（如构建 Filter 链）
+        return protocol.export(buildInvokerChain(invoker, ...));
+    }
+}
+// 实际调用链：ProtocolFilterWrapper → ProtocolListenerWrapper → DubboProtocol
+```
+
+**@Adaptive 自适应扩展原理**：
+
+```java
+// 标注了 @Adaptive 的接口方法，Dubbo 会动态生成代理类
+// 代理类在运行时根据 URL 参数决定使用哪个实现
+Protocol$Adaptive implements Protocol {
+    @Override
+    public Exporter export(Invoker invoker) {
+        URL url = invoker.getUrl();
+        String extName = url.getProtocol();  // 从URL取protocol参数
+        // 动态选择实现：dubbo/http/rmi...
+        Protocol extension = ExtensionLoader.getExtensionLoader(Protocol.class)
+            .getExtension(extName);
+        return extension.export(invoker);
+    }
+}
+```
+
+> 口诀：**JDK SPI = 全量加载 + 无名称；Dubbo SPI = 按需加载 + KV配置 + IOC/AOP 支持**
+
 **其他扩展点同理**：自定义 LoadBalance、Router、Cluster 都是这三步，只是实现的接口和 SPI 文件名不同。
 
 **Dubbo 3.x 新增方式**：可以用 Spring Bean 注册扩展，在 Spring 容器启动后动态添加，更灵活。

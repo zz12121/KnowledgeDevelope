@@ -208,3 +208,98 @@ epoll_wait(epfd, events, maxevents, timeout) → 等待事件，返回就绪的 
 5. **ID 唯一标识**：每个 Netty Channel 有全局唯一的 `ChannelId`，便于日志追踪和连接管理
 
 **举例**：`NioSocketChannel` 内部持有一个 `java.nio.channels.SocketChannel`，对 Netty 的 `write()`/`read()` 调用，最终会调到底层 NIO Channel 的对应方法，并配合 Selector 完成事件驱动。
+
+---
+
+###### 高频面试题：BIO/NIO/AIO 与 IO 模型
+
+---
+
+###### Q1. BIO、NIO、AIO 有什么区别？——高频面试引导问题
+
+**五种IO模型对比**：
+
+| IO模型 | 等待数据 | 数据拷贝 | 特点 |
+|--------|---------|---------|------|
+| BIO（阻塞IO） | 阻塞 | 阻塞 | 简单，一连接一线程 |
+| NIO（非阻塞IO） | 非阻塞（轮询） | 阻塞 | 轮询消耗CPU |
+| IO多路复用 | 非阻塞（select/epoll） | 阻塞 | 单线程管理多连接 |
+| 信号驱动IO | 非阻塞（信号通知） | 阻塞 | 少用 |
+| AIO（异步IO） | 非阻塞 | 非阻塞 | 真正异步，内核完成后通知 |
+
+**关键区分**：
+- **同步/异步**：数据拷贝时是否阻塞。BIO/NIO/多路复用都是同步（拷贝时阻塞），AIO是异步（完全不阻塞）
+- **阻塞/非阻塞**：等待数据时是否阻塞。BIO阻塞，NIO/多路复用非阻塞
+
+**回答示例**：
+
+> Java 里的 BIO/NIO/AIO：
+> - **BIO**：一个连接一个线程，读写阻塞，适合连接少且每个连接耗时长的场景
+> - **NIO**：引入 Channel + Selector，单线程可管理多个连接，通过 select/epoll 等待事件，适合连接多、读写频繁的场景（Netty 底层）
+> - **AIO**：内核完成读写后通知程序，程序完全不阻塞，适合超高并发，但 Linux 下 AIO 支持不完善，实践中用得少
+>
+> 追问：Java NIO 的 Selector 底层是什么？
+> 在 Linux 下默认是 epoll，在 Mac 是 kqueue，在 Windows 是 IOCP。Netty 还额外提供了原生 epoll 传输（`EpollEventLoopGroup`），性能比 Java NIO 的 epoll 封装更好。
+
+---
+
+###### Q2. select、poll、epoll 有什么区别？为什么 Netty 性能高？——高频面试引导问题
+
+**三者对比**：
+
+| 特性 | select | poll | epoll |
+|------|--------|------|-------|
+| fd 数量 | 最多 1024 | 无限制 | 无限制 |
+| 数据传输 | 每次调用拷贝全部 fd | 每次调用拷贝全部 pollfd | 注册时拷贝一次 |
+| 就绪检测 | 遍历 O(n) | 遍历 O(n) | 就绪链表 O(1) |
+| 触发方式 | LT（水平触发） | LT | LT 和 ET（边缘触发） |
+
+**epoll 快的三个原因**：
+
+```
+1. 内核维护红黑树存储注册的 fd
+   → epoll_ctl() 增删改，无需每次传全量 fd
+
+2. 就绪链表
+   → fd 就绪时，内核自动加入就绪链表
+   → epoll_wait() 直接取就绪的，不需要遍历全部
+
+3. 注册只拷贝一次
+   → select/poll 每次调用都要把 fd_set 从用户空间拷贝到内核
+   → epoll 只需要注册时拷贝一次
+```
+
+**回答示例**：
+
+> epoll 相比 select/poll 的本质区别是**从主动轮询变成事件通知**：
+> - select/poll：每次都把所有 fd 告诉内核，内核遍历检查，把就绪的标记，用户再遍历 O(n)
+> - epoll：一次注册，内核用回调机制（fd 就绪时加入就绪链表），用户直接取，O(1)
+>
+> Netty 基于 epoll（Linux）+ 主从 Reactor + ByteBuf 内存池，三重优化让并发性能极高。
+
+---
+
+###### Q3. Netty 的 ByteBuf 和 JDK 的 ByteBuffer 有什么区别？——高频面试引导问题
+
+**对比**：
+
+| 特性 | JDK ByteBuffer | Netty ByteBuf |
+|------|---------------|---------------|
+| 读写索引 | 同一个 position，读写要 flip | 分离的 readerIndex/writerIndex |
+| 扩容 | 不支持，固定容量 | 自动扩容 |
+| 内存 | 堆内存/直接内存 | 堆内存/直接内存/池化/复合 |
+| 内存池 | 无 | PooledByteBufAllocator（减少GC） |
+| 零拷贝 | transferTo | CompositeByteBuf（逻辑合并） |
+
+**回答示例**：
+
+> Netty ByteBuf 最大的优势：
+> 1. **读写分离**：两个独立指针，不需要 flip，代码简单
+> 2. **自动扩容**：`writeBytes()` 时如果空间不足自动扩容，不用手动预估大小
+> 3. **内存池**：`PooledByteBufAllocator` 复用 ByteBuf 对象，减少 GC 压力，高并发场景提升显著
+> 4. **CompositeByteBuf**：多个 ByteBuf 逻辑合并，零拷贝，避免数据合并时的内存复制
+>
+> 追问：为什么推荐用直接内存（Direct Memory）？
+> 直接内存不经过 JVM GC，适合大量数据的传输，减少 JVM GC 停顿对网络性能的影响。但分配和回收成本高，用内存池可以均摊成本。
+
+📖 [[../../../35_NettyKnowledge/03_高性能设计]]

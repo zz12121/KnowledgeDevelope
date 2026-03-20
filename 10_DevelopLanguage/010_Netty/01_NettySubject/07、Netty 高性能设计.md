@@ -137,6 +137,124 @@ serverBootstrap
 
 - 开启泄漏检测：`-Dio.netty.leakDetection.level=ADVANCED`
 - 监控 EventLoop 任务队列积压
+
+---
+
+###### 源码深度：Netty 高性能设计的核心实现
+
+**Reactor 线程模型源码**：
+
+```java
+// Netty 主从 Reactor 模型
+// Boss EventLoopGroup：专门处理 Accept
+// Worker EventLoopGroup：专门处理 I/O 读写
+
+EventLoopGroup bossGroup = new NioEventLoopGroup(1);   // 1个线程接受连接
+EventLoopGroup workerGroup = new NioEventLoopGroup();  // N个线程处理I/O（默认CPU*2）
+
+// 每个 NioEventLoop 绑定一个 Selector，无锁化设计
+public final class NioEventLoop extends SingleThreadEventLoop {
+    private Selector selector;  // 每个线程一个Selector
+    
+    @Override
+    protected void run() {
+        for (;;) {
+            select();           // 1. epoll_wait 等待事件
+            processSelectedKeys();   // 2. 处理I/O事件
+            runAllTasks();      // 3. 执行任务队列（定时任务等）
+        }
+    }
+}
+```
+
+**Epoll 空轮询 Bug 解决**：
+
+```java
+// JDK NIO 的 Epoll Bug：select()无事件时可能立即返回，导致 CPU 100%
+// Netty 的解法：记录空轮询次数，超过阈值（默认512）则重建 Selector
+
+private void select(boolean oldWakenUp) {
+    Selector selector = this.selector;
+    int selectCnt = 0;
+    long currentTimeNanos = System.nanoTime();
+    
+    for (;;) {
+        int selectedKeys = selector.select(timeoutMillis);
+        selectCnt++;
+        
+        if (selectedKeys != 0 || ...) {
+            break;  // 有事件，正常退出
+        }
+        
+        // 检测到空轮询：超过512次就重建Selector，将原有channel重新注册
+        if (SELECTOR_AUTO_REBUILD_THRESHOLD > 0 && selectCnt >= SELECTOR_AUTO_REBUILD_THRESHOLD) {
+            rebuildSelector();  // 重建解决Bug
+            break;
+        }
+    }
+}
+```
+
+**FastThreadLocal 原理**：
+
+```java
+// JDK ThreadLocal 的问题：
+// 1. hash 冲突用线性探测，慢
+// 2. 通过 Thread.threadLocals 弱引用，不能及时释放
+
+// Netty FastThreadLocal：
+// 1. 用数组直接索引，O(1) 无冲突
+// 2. 每个 FastThreadLocal 有唯一 index（全局原子递增）
+// 3. FastThreadLocalThread 内部持有 InternalThreadLocalMap
+
+public class FastThreadLocal<V> {
+    private final int index = InternalThreadLocalMap.nextVariableIndex(); // 编译期确定偏移量
+    
+    public final V get() {
+        InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();
+        Object v = threadLocalMap.indexedVariable(index);  // 数组直接索引，无hash
+        if (v != InternalThreadLocalMap.UNSET) {
+            return (V) v;
+        }
+        return initialize(threadLocalMap);
+    }
+}
+```
+
+**HashedWheelTimer 时间轮原理（心跳检测核心）**：
+
+```java
+// 核心思想：把时间范围分成多个槽（bucket），每个槽存放到期任务
+// 类似时钟，指针每次移动一格（tickDuration），执行当前槽的所有任务
+
+// 举例：ticksPerWheel=512，tickDuration=100ms
+// 总覆盖时间=512*100ms=51.2秒，指针每100ms走一格
+
+HashedWheelTimer timer = new HashedWheelTimer(
+    100, TimeUnit.MILLISECONDS,  // tickDuration：每格100ms
+    512                          // ticksPerWheel：512格，总51.2秒
+);
+
+// 添加任务：计算落在哪个格
+// 延迟5秒 → 第50格，rounds=0
+// 延迟100秒 → 第1000格 % 512 = 488格，rounds=1（需要转2圈）
+timer.newTimeout(timeout -> {
+    System.out.println("5秒后执行");
+}, 5, TimeUnit.SECONDS);
+
+// Netty IdleStateHandler 就是用 HashedWheelTimer 实现读写空闲检测
+```
+
+**Netty I/O 调度优化对比**：
+
+| 技术点 | 传统做法 | Netty 做法 | 性能提升 |
+|--------|---------|-----------|---------|
+| 线程模型 | 每连接一线程 | Reactor+EventLoop | 数千倍连接数 |
+| 内存管理 | 每次 new byte[] | 内存池+ByteBuf | 减少GC压力 |
+| 线程本地 | ThreadLocal | FastThreadLocal | 1.5-2倍 |
+| 定时任务 | ScheduledExecutor | HashedWheelTimer | O(1)添加/取消 |
+| 序列化 | Java 序列化 | Protobuf/Kryo | 5-10倍 |
+| 零拷贝 | 多次内存拷贝 | FileRegion/CompositeByteBuf | 减少数据拷贝 |
 - 用 jstack 分析线程状态，jstat 观察 GC 情况
 
 ---

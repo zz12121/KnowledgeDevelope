@@ -80,3 +80,16 @@
 ###### 4. Tomcat 的 Filter 和 Listener 的执行顺序？
 ###### 5. Tomcat 的异步 Servlet 如何实现？
 ###### 6. Tomcat 的 SSI（Server Side Include）如何使用？
+### 十三、Servlet 容器与源码深度
+###### 1. Servlet 的生命周期是怎样的？init、service、destroy 方法分别在什么时候被调用？
+###### 2. 为什么说 Servlet 是单实例多线程的？这会导致什么问题？如何避免？
+###### 3. load-on-startup 的作用是什么？值为负数和正数有什么区别？
+###### 4. HttpServlet 是如何根据请求方法（GET/POST/PUT/DELETE）分发到对应的 doXXX 方法的？
+###### 5. 请简述 DispatcherServlet 的继承层次和请求处理流程？
+###### 6. ServletContainerInitializer (SCI) 的作用是什么？Spring Boot 是如何利用它启动的？
+###### 7. Tomcat 的类加载器层次结构是怎样的？为什么 WebappClassLoader 要打破双亲委派？
+###### 8. Tomcat 中每个 Web 应用都有独立的类加载器，这带来了哪些好处？
+###### 9. Tomcat 类加载器的 delegate 属性设置为 true 和 false 有什么区别？
+###### 10. 请简述一次完整的 HTTP 请求在 Tomcat 中的处理流程（从 Socket 到 Servlet.service）？
+###### 11. StandardWrapperValve 在请求处理中起到什么作用？它是如何调用 Servlet 的？
+###### 12. FilterChain 是如何实现多个 Filter 链式调用的？请简述其原理？

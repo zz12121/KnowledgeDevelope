@@ -272,3 +272,114 @@ AOP 特别适合那些"每个业务方法都要做，但又不应该写进业务
 **数据脱敏**：返回给前端的数据自动对手机号、身份证等字段做脱敏处理。
 
 📖 [[../../../24_SpringKnowledge/02_AOP面向切面/01、AOP面向切面编程#九、AOP 应用场景]]
+
+---
+
+###### 9. Spring AOP 代理创建的源码流程是什么？——高频面试引导问题
+
+**代理创建核心链路**：
+
+```
+@EnableAspectJAutoProxy
+└── 注册 AnnotationAwareAspectJAutoProxyCreator（BeanPostProcessor）
+    └── postProcessAfterInitialization()
+        └── wrapIfNecessary()
+            ├── getAdvicesAndAdvisorsForBean()  ← 查找匹配的切面
+            └── createProxy()                   ← 创建代理
+                ├── 有接口 → JDK动态代理
+                └── 无接口或proxyTargetClass=true → CGLIB
+```
+
+**回答示例**：
+
+> Spring AOP 代理是在 Bean 初始化完成后（`postProcessAfterInitialization`）创建的：
+> 1. `AnnotationAwareAspectJAutoProxyCreator` 是个 `BeanPostProcessor`，容器创建每个 Bean 时都会经过它
+> 2. `wrapIfNecessary()` 检查该 Bean 是否有匹配的切面，没有就直接返回
+> 3. 有切面则调用 `createProxy()`，根据目标类是否有接口决定用 JDK 还是 CGLIB
+>
+> 追问：切面是怎么查找的？
+> 从 IoC 容器里找所有带 `@Aspect` 的 Bean，解析里面的 `@Before/@After/@Around` 等方法，生成 `Advisor` 列表，然后和当前 Bean 的方法做切点表达式匹配。
+
+---
+
+###### 10. Spring AOP 方法调用拦截器链是怎么工作的？——高频面试引导问题
+
+**拦截器链执行原理**：
+
+```java
+// 代理方法调用入口（CGLIB）
+public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) {
+    List<Object> chain = advisedSupport.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+    if (chain.isEmpty()) {
+        return methodProxy.invoke(target, args);  // 无拦截器，直接调用
+    }
+    // 构建拦截器链，递归执行
+    ReflectiveMethodInvocation invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
+    return invocation.proceed();
+}
+
+// proceed() 递归执行：当前拦截器调用proceed()才会走到下一个
+public Object proceed() throws Throwable {
+    if (this.currentInterceptorIndex == interceptorsAndDynamicMethodMatchers.size() - 1) {
+        return invokeJoinpoint();  // 最后一个：调用目标方法
+    }
+    Object interceptorOrInterceptionAdvice = interceptorsAndDynamicMethodMatchers.get(++currentInterceptorIndex);
+    return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);  // 调用下一个
+}
+```
+
+**通知执行顺序**：
+
+```
+@Around前 → @Before → 目标方法 → @AfterReturning/@AfterThrowing → @After → @Around后
+```
+
+**回答示例**：
+
+> 拦截器链是个递归调用：
+> - `ReflectiveMethodInvocation.proceed()` 维护一个下标 `currentInterceptorIndex`
+> - 每个拦截器执行完自己的逻辑后调用 `invocation.proceed()` 推进下标
+> - 下标到头就调用目标方法，然后一层层返回
+> - 这就是为什么 `@Around` 能控制目标方法是否执行—— `@Around` 的 `pjp.proceed()` 就是这个递归调用
+
+---
+
+###### 11. Spring AOP 为什么自调用不生效？怎么解决？——高频面试引导问题
+
+**原因**：
+
+```java
+// AOP 通过代理对象拦截方法调用
+// this.b() = 目标对象直接调用，不经过代理，AOP失效
+
+@Service
+public class OrderService {
+    @Transactional
+    public void createOrder() {
+        this.sendMessage();  // ❌ this是目标对象，不是代理
+    }
+    
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void sendMessage() {}
+}
+```
+
+**解决方案对比**：
+
+| 方案 | 做法 | 优缺点 |
+|------|------|--------|
+| 注入自身 | `@Autowired private OrderService self` | 简单，有循环依赖风险 |
+| AopContext | `((OrderService) AopContext.currentProxy()).sendMessage()` | 耦合度高，需要开启exposeProxy |
+| 抽出新类 | 把 sendMessage 移到另一个 Service | 最干净，推荐 |
+
+**回答示例**：
+
+> 我们项目遇到自调用失效，最终采用的是抽出新类：
+> - 把需要独立事务的方法抽到 `NotificationService`
+> - 注入 `NotificationService` 调用，就经过代理了
+>
+> 为什么不用 AopContext？代码可读性差，而且有隐式依赖，测试时容易出问题。
+
+---
+
+📖 [[../../../24_SpringKnowledge/09_源码深度解析/03_AOP源码/01、AOP代理创建源码]]

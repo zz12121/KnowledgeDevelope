@@ -41,7 +41,60 @@
 
 📖 [[../../../../27_SpringCloudKnowledge/04_熔断降级与网关/01、熔断降级与服务网关#六、Spring Cloud Gateway]]
 
-###### 6. 什么是 Zuul？
+###### 26. Spring Cloud Gateway 的路由匹配是如何实现的？RoutePredicateHandlerMapping 源码？
+[[../../../../27_SpringCloudKnowledge/04_熔断降级与网关/01、熔断降级与服务网关#源码深度：Spring Cloud Gateway 请求处理全流程|📖]] Gateway 基于 Spring WebFlux，路由匹配由 `RoutePredicateHandlerMapping` 完成，它实现了 WebFlux 的 `HandlerMapping` 接口：
+
+```java
+// getHandlerInternal 是 HandlerMapping 接口的核心方法
+protected Mono<?> getHandlerInternal(ServerWebExchange exchange) {
+    return lookupRoute(exchange)
+        .flatMap(r -> {
+            exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, r);  // 存入匹配的 Route
+            return Mono.just(webHandler);  // 返回 FilteringWebHandler
+        });
+}
+
+protected Mono<Route> lookupRoute(ServerWebExchange exchange) {
+    return routeLocator.getRoutes()
+        // concatMap 保证按路由声明顺序匹配（first-match wins，类似 Nginx location）
+        .concatMap(route -> Mono.just(route).filterWhen(r ->
+            r.getPredicate().apply(exchange)  // 执行 AsyncPredicate
+        ))
+        .next();  // 取第一个匹配
+}
+```
+
+**关键设计**：使用 `concatMap`（而非 `flatMap`）确保按路由声明顺序串行匹配，不是并行；多个 Predicate 通过 `AndAsyncPredicate` 组合（AND 逻辑）。路由顺序影响匹配结果，这与 Nginx location 顺序优先类似。
+
+###### 27. FilteringWebHandler 的责任链是怎么工作的？GlobalFilter 和 GatewayFilter 的区别和合并顺序？
+[[../../../../27_SpringCloudKnowledge/04_熔断降级与网关/01、熔断降级与服务网关#源码深度：Spring Cloud Gateway 请求处理全流程|📖]] `FilteringWebHandler.handle()` 核心逻辑：
+
+1. 从 `exchange` 中取出匹配的 `Route`（由 RoutePredicateHandlerMapping 存入）
+2. 将 **GlobalFilter 列表**（`globalFilters`，作用于所有路由）与 **Route 的 GatewayFilter 列表**（只作用于该路由）合并
+3. 按 `Order` 值升序排序（值越小越先执行）
+4. 包装为 `DefaultGatewayFilterChain`（责任链），每个 filter 执行完调用 `chain.filter(exchange)` 传给下一个
+
+**关键 GlobalFilter 执行顺序（Order 值）**：
+- `RouteToRequestUrlFilter`（10000）：构建真实 URL，将 `lb://serviceName/path` 解析为最终请求地址
+- `ReactiveLoadBalancerClientFilter`（10100）：处理 `lb://` 协议，从注册中心选实例
+- `NettyRoutingFilter`（MAX_VALUE）：最后执行，用 Netty HttpClient 真正转发 HTTP 请求
+
+**前置处理 vs 后置处理**：filter 中 `chain.filter(exchange)` 之前的代码是前置处理（修改请求），`.then(Mono.fromRunnable(...))` 之后的代码是后置处理（修改响应）——执行顺序是前置按 Order 升序，后置按 Order 降序。
+
+###### 28. Gateway 如何实现动态路由？CachingRouteLocator 的缓存刷新机制？
+[[../../../../27_SpringCloudKnowledge/04_熔断降级与网关/01、熔断降级与服务网关#源码深度：Spring Cloud Gateway 请求处理全流程|📖]] Gateway 通过三层 RouteLocator 组合支持动态路由：
+
+- `PropertiesRouteDefinitionLocator`：从 `application.yml` 读取静态路由
+- `InMemoryRouteDefinitionRepository`：运行时通过 `RouteDefinitionWriter.save()` 动态添加路由
+- `CachingRouteLocator`（`@Primary`）：用 `ConcurrentHashMap` 缓存所有路由，避免每次请求都重新计算
+
+**刷新流程**：
+1. 通过 Gateway Actuator API（`POST /actuator/gateway/routes`）或编程方式调用 `RouteDefinitionWriter.save()`
+2. 发布 `RefreshRoutesEvent` 事件
+3. `CachingRouteLocator` 监听该事件，清空缓存，重新从所有 `RouteDefinitionLocator` 拉取，并发布 `RefreshRoutesResultEvent`
+4. 所有后续请求使用新的路由表
+
+**生产实践**：结合 Nacos 配置中心，监听 Nacos 配置变更事件 → 发布 `RefreshRoutesEvent`，实现零停机的路由热更新。
 Zuul是Netflix开源的一款提供**动态路由、监控、弹性和安全**等边缘服务的**微服务网关**组件。它在微服务架构中扮演**流量门卫**的角色，是所有请求进入系统后的第一站。
 Zuul的核心工作原理是**基于过滤器链**。一个HTTP请求在Zuul中的生命周期会经历一系列具有不同职责的过滤器处理。
 
