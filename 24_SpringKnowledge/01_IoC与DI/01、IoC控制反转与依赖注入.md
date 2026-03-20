@@ -118,4 +118,18 @@ Spring 采用模块化架构，按需引入：
 
 ---
 
+## 参考资料
+
+> 本章节对应的原始参考资料和深入学习资源：
+
+- **[IoC 容器源码](./E:/md/1/Spring/IoC/)** — Spring IoC 容器完整源码分析
+- **[clazz 类加载与 Bean 解析](./E:/md/1/Spring/clazz/)** — BeanDefinition 解析与注册
+- **[Spring 整体脉络](./E:/md/1/Spring/Spring整体脉络/)** — Spring 框架整体架构
+- **[参考资料索引](../参考资料索引.md)** — 所有参考资料的总索引
+
+**知识库双链**：
+- 面试题库：[10_DevelopLanguage/005_Spring/01_SpringSubject/01、Spring 核心概念.md](../../10_DevelopLanguage/005_Spring/01_SpringSubject/01、Spring核心概念.md) — Spring 核心概念面试题
+
+---
+
 相关面试题 → [[../../10_DevelopLanguage/005_Spring/01_SpringSubject/01、Spring 核心概念|01、Spring核心概念]]

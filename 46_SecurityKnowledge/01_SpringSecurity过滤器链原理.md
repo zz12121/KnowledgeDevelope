@@ -351,6 +351,18 @@ Collection<? extends GrantedAuthority> authorities = authentication.getAuthoriti
 
 ---
 
+## 参考资料
+
+> 本章节对应的原始参考资料和深入学习资源：
+
+- **[SpringSecurity 请求全过程解析](./E:/md/1/SpringSecurity/SpringSecurity请求全过程解析.md)** — Spring Security 过滤器链完整分析
+- **[参考资料索引](../参考资料索引.md)** — 所有参考资料的总索引
+
+**知识库双链**：
+- 面试题库：[10_DevelopLanguage/005_Spring/04_SpringCloudSubject/10、安全认证.md](../10_DevelopLanguage/005_Spring/04_SpringCloudSubject/10、安全认证.md) — Spring Security 面试题
+
+---
+
 ## 相关面试题
 
 - [[../10_DevelopLanguage/005_Spring/04_SpringCloudSubject/10、安全认证|📖 10、安全认证]]

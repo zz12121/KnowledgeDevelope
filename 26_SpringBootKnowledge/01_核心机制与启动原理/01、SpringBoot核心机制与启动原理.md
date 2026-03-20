@@ -287,6 +287,22 @@ public class MyAutoConfiguration {
 
 ---
 
+## 参考资料
+
+> 本章节对应的原始参考资料和深入学习资源：
+
+- **[SpringBoot-自动装配.md](./E:/md/1/SpringBoot/SpringBoot-自动装配.md)** — 自动装配原理深度解析
+- **[SpringBoot-application-load.md](./E:/md/1/SpringBoot/SpringBoot-application-load.md)** — 应用启动流程源码分析
+- **[Spring-Boot-Run.md](./E:/md/1/SpringBoot/Spring-Boot-Run.md)** — Spring Boot 启动原理
+- **[SpringBoot-ConditionalOnBean.md](./E:/md/1/SpringBoot/SpringBoot-ConditionalOnBean.md)** — 条件装配机制
+- **[SpringBoot-ConfigurationProperties.md](./E:/md/1/SpringBoot/SpringBoot-ConfigurationProperties.md)** — 配置属性绑定原理
+- **[参考资料索引](../参考资料索引.md)** — 所有参考资料的总索引
+
+**知识库双链**：
+- 面试题库：[10_DevelopLanguage/005_Spring/03_SpringBootSubject/01、Spring Boot 基础概念.md](../../10_DevelopLanguage/005_Spring/03_SpringBootSubject/01、Spring%20Boot%20基础概念.md) — Spring Boot 面试题
+
+---
+
 ## 相关面试题 →
 
 [[../../10_Developlanguage/005_Spring/03_SpringBootSubject/01、Spring Boot 基础概念]]

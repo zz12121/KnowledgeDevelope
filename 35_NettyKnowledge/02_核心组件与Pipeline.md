@@ -141,6 +141,17 @@ channel.writeAndFlush(msg).sync();
 
 ---
 
+## 参考资料
+
+> 本章节对应的原始参考资料和深入学习资源：
+
+- **[Netty主要组件源码分析](./E:/md/1/Netty/Netty主要组件源码分析/)** — Channel/EventLoop/Pipeline 源码
+- **[Netty技术细节源码分析](./E:/md/1/Netty/Netty技术细节源码分析/)** — 底层实现细节
+- **[Netty编解码](./E:/md/1/Netty/Netty编解码/)** — 编解码器实现
+- **[参考资料索引](../参考资料索引.md)** — 所有参考资料的总索引
+
+---
+
 ## 7. 相关链接
 
 - [[35_NettyKnowledge/01_核心架构与基础概念]]
